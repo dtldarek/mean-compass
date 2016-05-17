@@ -1,9 +1,9 @@
-CC=clang
-CXX=clang++
+CC=gcc
+CXX=g++
 RM=rm -f
 CPPFLAGS=-g -std=c++11 -I/usr/include/eigen3/
 LDFLAGS=-g
-LDLIBS=-lmpfr -lgmp
+LDLIBS=-lmpfr -lgmp -lboost_random -lboost_program_options
 
 SRCS=mean-compass.cc
 OBJS=$(subst .cc,.o,$(SRCS))
