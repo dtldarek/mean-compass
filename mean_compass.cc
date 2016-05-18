@@ -6,69 +6,22 @@
  *
  */
 
+#include "mean_compass.h"
 #include <cassert>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
-#include <boost/multiprecision/cpp_int.hpp>
-#include <boost/multiprecision/mpfr.hpp>
 #include <boost/program_options.hpp>
-#include <boost/random.hpp>
-#include <boost/random/random_device.hpp>
-#include <Eigen/OrderingMethods>
-#include <Eigen/SparseCore>
-#include <Eigen/SparseLU>
+#include "types.h"
+#include "utils.h"
 
 namespace {
-
-typedef boost::multiprecision::cpp_int             Integer;
-typedef boost::multiprecision::cpp_rational        Rational;
-typedef boost::multiprecision::mpfr_float          Real;
-typedef Eigen::Triplet<Real>                       Triplet;
-typedef int                                        Index;
-
-typedef Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>  DenseMatrix;
-typedef Eigen::Matrix<Real, Eigen::Dynamic, 1>               DenseVector;
-typedef Eigen::SparseMatrix<Real, Eigen::ColMajor, Index>    SparseMatrix;
-// The parameter 0 denotes that no flag is used.
-typedef Eigen::SparseVector<Real, 0, Index>                  SparseVector;
-
-typedef Eigen::SparseLU<SparseMatrix, Eigen::COLAMDOrdering<Index>> SparseLU;
-
-// For any integer-like type T returns a random number of that type
-// that is uniformly distributed in [0, size).
-template<typename I = Integer> I unirand(I size) {
-  static boost::random_device random_device;
-  static boost::random::mt19937 generator(random_device);
-  assert(size >= 1);
-  boost::random::uniform_int_distribution<I> uniform_integer(0, size - 1);
-  return uniform_integer(generator);
-}
-
-// Returns a random Real number uniformly distributed in [0,1).
-Real unirand() {
-  Integer denominator = Integer(1) << Real::default_precision();
-  Integer nominator = unirand(denominator);
-  Rational result(nominator, denominator);
-  return static_cast<Real>(result);
-}
-
-// Check if the value is between min and max and throw an exception if not.
-template<typename T, const T min, const T max>
-void check_range(const T& value) {
-  if (value < min || value > max) {
-    std::stringstream description;
-    description
-      << "The value " << value << " is outside of "
-      << "[" << min << ", " << max << "] range";
-    throw std::out_of_range(description.str());
-  }
-}
 
 }  // anonymous namespace
 
 
 int main(int argc, char** argv) {
+  using namespace mean_compass;
   // Parse cmdline flags. {{{
   int default_precision = 256;
   std::string config_file_name;
@@ -88,7 +41,7 @@ int main(int argc, char** argv) {
       // We use int, because program_options parses "-5" with unsigned types.
       ("default-precision,p",
            po::value<int>(&default_precision)->notifier(
-             check_range<int, 2, std::numeric_limits<int>::max()>),
+             utils::check_range<int, 2, std::numeric_limits<int>::max()>),
            "Set the default precision of MPFR.")
       ("input-file",
            po::value<std::vector<std::string>>()->composing(),
@@ -131,9 +84,9 @@ int main(int argc, char** argv) {
   triplets.reserve(10*size);
   for (size_t ii = 0; ii < 10*size; ++ii) {
     triplets.push_back(Triplet(
-          unirand<Index>(size),
-          unirand<Index>(size),
-          unirand()));
+          utils::unirand<Index>(size),
+          utils::unirand<Index>(size),
+          utils::unirand()));
   }
   SparseMatrix A(size, size);
   A.setFromTriplets(triplets.begin(), triplets.end());
