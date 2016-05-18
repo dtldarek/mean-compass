@@ -10,7 +10,10 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
+#include <string>
+#include <vector>
 #include <boost/program_options.hpp>
 #include "types.h"
 #include "utils.h"
@@ -21,6 +24,7 @@ namespace {
 
 
 int main(int argc, char** argv) {
+  // FIXME: Only the most basic things in main().
   using namespace mean_compass;
   // Parse cmdline flags. {{{
   int default_precision = 256;
