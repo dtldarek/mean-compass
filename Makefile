@@ -1,28 +1,29 @@
 CC=gcc
 CXX=g++
 RM=rm -f
-CPPFLAGS=-g -std=c++11 -I/usr/include/eigen3/
+CXXFLAGS=-g -Wall -MMD -std=c++11 -I/usr/include/eigen3/
 LDFLAGS=-g
 LDLIBS=-lmpfr -lgmp -lboost_random -lboost_program_options
 
-SRCS=mean_compass.cc utils.cc
-OBJS=$(subst .cc,.o,$(SRCS))
+SUBDIRS=.depends build
+SRCS=src/mean_compass.cc src/utils.cc
+OBJS=$(SRCS:src/%.cc=build/%.o)
 
 all: mean-compass
 
 mean-compass: $(OBJS)
+	@echo Linking $@
 	$(CXX) $(LDFLAGS) -o mean-compass $(OBJS) $(LDLIBS) 
 
-depend: .depend
-
-.depend: $(SRCS)
-	rm -f ./.depend
-	$(CXX) $(CPPFLAGS) -MM $^>>./.depend;
+build/%.o: src/%.cc
+	@echo Compiling $@
+	@mkdir -p $(SUBDIRS)
+	$(CXX) $(CXXFLAGS) -MMD -MF $(patsubst build/%.o,.depends/%.d,$@) -c -o $@ $<
 
 clean:
 	$(RM) $(OBJS)
 
 dist-clean: clean
-	$(RM) *~ .depend
+	$(RM) *~ .depends/*.d
 
-include .depend
+-include $(SRCS:src/%.cc=.depends/%.d)
