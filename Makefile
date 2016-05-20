@@ -1,12 +1,12 @@
 CC=gcc
 CXX=g++
 RM=rm -f
-CXXFLAGS=-g -Wall -MMD -std=c++11 -I/usr/include/eigen3/
+CXXFLAGS=-g -O2 -Wall -MMD -std=c++11 -I/usr/include/eigen3/
 LDFLAGS=-g
 LDLIBS=-lmpfr -lgmp -lboost_random -lboost_program_options
 
 SUBDIRS=.depends build
-SRCS=src/mean_compass.cc src/utils.cc
+SRCS=src/utf8_io.cc src/graph.cc src/mean_compass.cc src/utils.cc
 OBJS=$(SRCS:src/%.cc=build/%.o)
 
 all: mean-compass

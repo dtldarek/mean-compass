@@ -17,6 +17,7 @@
 #include <boost/program_options.hpp>
 #include "types.h"
 #include "utils.h"
+#include "utf8_io.h"
 
 namespace {
 
@@ -26,25 +27,33 @@ namespace {
 int main(int argc, char** argv) {
   // FIXME: Only the most basic things in main().
   using namespace mean_compass;
+
   // Parse cmdline flags. {{{
-  int default_precision = 256;
-  std::string config_file_name;
+  bool option_verbose = false;
+  bool option_use_colors = false;
+  std::string option_config_file_name;
+  int option_default_precision = 256;
 
   try {
     namespace po = boost::program_options;
     po::options_description generic_options("Generic options");
     generic_options.add_options()
       ("help,h", "Print help and usage message.")
-      ("verbose,v", "Be more verbose.")
+      ("verbose,v",
+	        po::value<bool>(&option_verbose),
+	       "Be more verbose.")
+	  ("color,c",
+	        po::bool_switch(&option_use_colors),
+			"Use ANSI terminal colors.")
       ("version", "Print version of the program.")
       ("config-file",
-           po::value<std::string>(&config_file_name),
+           po::value<std::string>(&option_config_file_name),
            "Parse options from configuration file given.");
     po::options_description config_options("Configuration");
     config_options.add_options()
       // We use int, because program_options parses "-5" with unsigned types.
       ("default-precision,p",
-           po::value<int>(&default_precision)->notifier(
+           po::value<int>(&option_default_precision)->notifier(
              utils::check_range<int, 2, std::numeric_limits<int>::max()>),
            "Set the default precision of MPFR.")
       ("input-file",
@@ -62,7 +71,7 @@ int main(int argc, char** argv) {
         variables_map);
     po::notify(variables_map);
     if (variables_map.count("config-file")) {
-      std::ifstream config_file(config_file_name);
+      std::ifstream config_file(option_config_file_name);
       po::store(po::parse_config_file(config_file, all_options),
           variables_map);
       variables_map.notify();
@@ -81,7 +90,7 @@ int main(int argc, char** argv) {
   // Do some tests. {{{
   const size_t size = 100;
 
-  Real::default_precision(default_precision);
+  Real::default_precision(option_default_precision);
   std::cout << std::setprecision(Real::default_precision());
 
   std::vector<Triplet> triplets;

@@ -18,8 +18,8 @@
 
 namespace mean_compass {
 
-typedef boost::multiprecision::cpp_int             Integer;
-typedef boost::multiprecision::cpp_rational        Rational;
+typedef boost::multiprecision::mpz_int             Integer;
+typedef boost::multiprecision::mpq_rational        Rational;
 typedef boost::multiprecision::mpfr_float          Real;
 typedef Eigen::Triplet<Real>                       Triplet;
 typedef int                                        Index;
