@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 #include <boost/program_options.hpp>
+#include "graph.h"
 #include "types.h"
 #include "utils.h"
 #include "utf8_io.h"
@@ -27,6 +28,11 @@ namespace {
 int main(int argc, char** argv) {
   // FIXME: Only the most basic things in main().
   using namespace mean_compass;
+  using MainConfig = Config<>;
+  using Index = MainConfig::Index;
+  using Real = MainConfig::Real;
+  using Matrix = MainConfig::Matrix;
+  using Vector = MainConfig::Vector;
 
   // Parse cmdline flags. {{{
   bool option_verbose = false;
@@ -93,25 +99,29 @@ int main(int argc, char** argv) {
   Real::default_precision(option_default_precision);
   std::cout << std::setprecision(Real::default_precision());
 
-  std::vector<Triplet> triplets;
+  std::vector<MainConfig::Triplet> triplets;
   triplets.reserve(10*size);
   for (size_t ii = 0; ii < 10*size; ++ii) {
-    triplets.push_back(Triplet(
+    triplets.push_back(MainConfig::Triplet(
           utils::unirand<Index>(size),
           utils::unirand<Index>(size),
           utils::unirand()));
   }
-  SparseMatrix A(size, size);
+  Matrix A(size, size);
   A.setFromTriplets(triplets.begin(), triplets.end());
   A.makeCompressed();
-  DenseVector b = DenseVector::Random(size);
+  Vector b = Vector::Random(size);
 
-  SparseLU solver;
+  MainConfig::LU solver;
   solver.analyzePattern(A);
   solver.factorize(A);
-  DenseVector x = solver.solve(b);
+  Vector x = solver.solve(b);
   std::cout << "relative error: " << (A*x - b).norm() / b.norm() << std::endl;
   // End doing some tests. }}}
+
+  UTF8Input input;
+  Graph<MainConfig> graph(&input);
+  std::cout << graph.n() << '\n';
 
   return 0;
 }

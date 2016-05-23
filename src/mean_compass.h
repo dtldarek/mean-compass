@@ -9,6 +9,8 @@
 #ifndef __MEAN_COMPASS_H__
 #define __MEAN_COMPASS_H__
 
+#include "types.h"
+
 namespace mean_compass {
 
 }  // namespace mean_compass

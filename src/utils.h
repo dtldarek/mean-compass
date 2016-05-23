@@ -34,7 +34,7 @@ struct AnsiColors {
 
 // For any integer-like type T returns a random number of that type
 // that is uniformly distributed in [0, size).
-template<typename I = Integer> inline I unirand(I size) {
+template<typename I = default_types::Integer> inline I unirand(I size) {
   static boost::random_device random_device;
   static boost::random::mt19937 generator(random_device);
   assert(size >= 1);
@@ -43,11 +43,11 @@ template<typename I = Integer> inline I unirand(I size) {
 }
 
 // Returns a random Real number uniformly distributed in [0,1).
-inline Real unirand() {
-  Integer denominator = Integer(1) << Real::default_precision();
-  Integer nominator = unirand(denominator);
-  Rational result(nominator, denominator);
-  return static_cast<Real>(result);
+inline default_types::Real unirand() {
+  default_types::Integer denominator = default_types::Integer(1) << default_types::Real::default_precision();
+  default_types::Integer nominator = unirand(denominator);
+  default_types::Rational result(nominator, denominator);
+  return static_cast<default_types::Real>(result);
 }
 
 // Check if the value is between min and max and throw an exception if not.

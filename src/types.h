@@ -18,19 +18,48 @@
 
 namespace mean_compass {
 
-typedef boost::multiprecision::mpz_int             Integer;
-typedef boost::multiprecision::mpq_rational        Rational;
-typedef boost::multiprecision::mpfr_float          Real;
-typedef Eigen::Triplet<Real>                       Triplet;
-typedef int                                        Index;
+namespace default_types {
 
-typedef Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>  DenseMatrix;
-typedef Eigen::Matrix<Real, Eigen::Dynamic, 1>               DenseVector;
-typedef Eigen::SparseMatrix<Real, Eigen::ColMajor, Index>    SparseMatrix;
+// I find the `using` syntax way more natural than `typedef`.
+using Index          = int;
+using Integer        = boost::multiprecision::mpz_int;
+using Rational       = boost::multiprecision::mpq_rational;
+using Real           = boost::multiprecision::mpfr_float;
+using Triplet        = Eigen::Triplet<Real>;
+
+using DenseMatrix    = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
+using DenseVector    = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
+using SparseMatrix   = Eigen::SparseMatrix<Real, Eigen::ColMajor, Index>;
 // The parameter 0 denotes that no flag is used.
-typedef Eigen::SparseVector<Real, 0, Index>                  SparseVector;
+using SparseVector   = Eigen::SparseVector<Real, 0, Index>;
 
-typedef Eigen::SparseLU<SparseMatrix, Eigen::COLAMDOrdering<Index>> SparseLU;
+using SparseLU       = Eigen::SparseLU<SparseMatrix, Eigen::COLAMDOrdering<Index>>;
+
+}  // namespace default_types
+
+template<
+    typename Index_     = default_types::Index,
+    typename Integer_   = default_types::Integer,
+    typename Rational_  = default_types::Rational,
+    typename Real_      = default_types::Real,
+	// If you use non-default Matrix_, please specify LU_ as well.
+    typename Matrix_    = Eigen::SparseMatrix<Real_, Eigen::ColMajor, Index_>,
+    typename Vector_    = Eigen::Matrix<Real_, Eigen::Dynamic, 1>,
+	// Beware, the default assumes that Matrix_ works with SparseLU.
+    typename LU_        = Eigen::SparseLU<Matrix_, Eigen::COLAMDOrdering<Index_>>,
+    typename Weight_    = Real_>
+class Config {
+ public:
+  using Index      = Index_;
+  using Integer    = Integer_;
+  using Rational   = Rational_;
+  using Real       = Real_;
+  using Matrix     = Matrix_;
+  using Triplet    = Eigen::Triplet<Real>;
+  using Vector     = Vector_;
+  using LU         = LU_;
+  using Weight     = Weight_;
+};
 
 }  // namespace mean_compass
 
