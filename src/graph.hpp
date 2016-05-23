@@ -26,7 +26,7 @@ template<typename Config> Graph<Config>::Graph(UTF8Input* input) {
   // It would be convinient to use 1-based indexes for vertices,
   // but I would like the matrix to be compatible with all the rest,
   // so we will use 0-based indexes.
-  for (Index ii = 0; ii <= n_; ++ii) {
+  for (Index ii = 0; ii < n_; ++ii) {
     input->get(&label_[ii]);
     index_[label_[ii]] = ii;
     input->get(&weight_[ii]);

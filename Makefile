@@ -1,15 +1,18 @@
-CC=gcc
-CXX=g++
 RM=rm -f
-CXXFLAGS=-g -O2 -Wall -MMD -std=c++11 -I/usr/include/eigen3/
-LDFLAGS=-g
+CXXFLAGS= -Wall -MMD -std=c++11 -I/usr/include/eigen3/
+LDFLAGS=
 LDLIBS=-lmpfr -lgmp -lboost_random -lboost_program_options
 
 SUBDIRS=.depends build
 SRCS=src/utf8_io.cc src/mean_compass.cc src/utils.cc
 OBJS=$(SRCS:src/%.cc=build/%.o)
 
+all: CXXFLAGS += -DNDEBUG -O2
 all: mean-compass
+
+debug: CXXFLAGS += -DDEBUG -g -O0
+debug: LDFLAGS += -g
+debug: mean-compass
 
 mean-compass: $(OBJS)
 	@echo Linking $@

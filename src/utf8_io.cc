@@ -140,8 +140,9 @@ UTF8Input& UTF8Input::get(Real* result) {
 }
 UTF8Input& UTF8Input::get(std::string* result) {
   auto validate = [this](char32_t c) { return this->is_anwp(c); };
-  auto continuation = [result, this](std::vector<std::string>&& buffer,
+  auto continuation = [result, this](std::vector<std::string>&& buffer_,
                                      size_t size) -> UTF8Input& {
+    std::vector<std::string> buffer(buffer_);
     result->clear();
     result->reserve(size);
     for (const std::string& s : buffer) {
@@ -153,8 +154,9 @@ UTF8Input& UTF8Input::get(std::string* result) {
 }
 UTF8Input& UTF8Input::get_base64(Integer* result) {
   auto validate = [this](char32_t c) { return this->is_anwp(c); };
-  auto continuation = [this, result](std::vector<std::string>&& buffer,
+  auto continuation = [this, result](std::vector<std::string>&& buffer_,
                                      size_t size) -> UTF8Input& {
+    std::vector<std::string> buffer(buffer_);
     uint_least32_t mid_buffer = 0;
     uint_least32_t bytes_in_mid_buffer = 0;
     std::vector<unsigned char> bytes;

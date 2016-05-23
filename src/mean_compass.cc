@@ -38,6 +38,7 @@ int main(int argc, char** argv) {
   bool option_verbose = false;
   bool option_use_colors = false;
   std::string option_config_file_name;
+  std::vector<std::string> input_files;
   int option_default_precision = 256;
 
   try {
@@ -63,12 +64,12 @@ int main(int argc, char** argv) {
              utils::check_range<int, 2, std::numeric_limits<int>::max()>),
            "Set the default precision of MPFR.")
       ("input-file",
-           po::value<std::vector<std::string>>()->composing(),
+           po::value<std::vector<std::string>>(&input_files)->composing(),
            "The input files to process.");
     po::options_description all_options;
     all_options.add(generic_options).add(config_options);
     po::positional_options_description positional_description;
-    positional_description.add("input_file", -1);
+    positional_description.add("input-file", -1);
 
     po::variables_map variables_map;
     po::store(po::command_line_parser(argc, argv)
@@ -92,7 +93,7 @@ int main(int argc, char** argv) {
     return 1;
   }
   // End of parsing cmdline flags }}}
-
+/*
   // Do some tests. {{{
   const size_t size = 100;
 
@@ -118,10 +119,15 @@ int main(int argc, char** argv) {
   Vector x = solver.solve(b);
   std::cout << "relative error: " << (A*x - b).norm() / b.norm() << std::endl;
   // End doing some tests. }}}
-
-  UTF8Input input;
-  Graph<MainConfig> graph(&input);
-  std::cout << graph.n() << '\n';
+*/
+  for (const std::string& input_file : input_files) {
+    std::cout << utils::AnsiColors::GREEN
+              << "Processing " << input_file
+              << utils::AnsiColors::ENDC << '\n' << std::flush;
+    UTF8Input input(input_file);
+    Graph<MainConfig> graph(&input);
+    std::cout << graph.n() << '\n';
+  }
 
   return 0;
 }
