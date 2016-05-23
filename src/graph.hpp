@@ -7,5 +7,6 @@
  */
 
 namespace mean_compass {
+
 }  // namespace mean_compass
 
