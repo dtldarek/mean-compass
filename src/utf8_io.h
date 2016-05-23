@@ -15,16 +15,17 @@
 #include <string>
 #include <boost/multiprecision/gmp.hpp>
 #include <boost/multiprecision/mpfr.hpp>
-
+// By intention we do not use "types.h" and class Config.
 
 namespace mean_compass {
 
 class UTF8Input {
-public:
-  // We redefine these two types, because unfortunatelly
+ public:
+  // By intention we do not use the Config class.
+  // We redefine these two types, because (unfortunatelly)
   // our implementation depends on the actual type.
-  typedef boost::multiprecision::mpz_int    Integer;
-  typedef boost::multiprecision::mpfr_float Real;
+  using Integer  = boost::multiprecision::mpz_int;
+  using Real     = boost::multiprecision::mpfr_float;
 
   static constexpr const char COMMENT = 0x23;  // ASCII code for '#';
   static constexpr const char PLUS    = 0x2B;  // ASCII code for '+';
@@ -40,7 +41,7 @@ public:
   static constexpr const char LOWERCASE_Z = 0x7A;  // ASCII code for 'z';
 
   class EndOfFileE : public std::runtime_error {
-  public:
+   public:
     EndOfFileE(const char* msg) : std::runtime_error(msg) { }
     EndOfFileE(const std::string& msg) : std::runtime_error(msg) { }
   };
@@ -92,7 +93,7 @@ public:
   template<typename T>
     UTF8Input& operator>>(T& result) { return get(&result); }
 
-protected:
+ protected:
   // NWP stands for ASCII non-white printable.
   static inline bool is_anwp(char32_t c) { return 0x21 <= c && c <= 0x7E; }
   static inline bool is_digit(char32_t c) { return ZERO <= c && c <= (ZERO + 9); }
@@ -159,5 +160,7 @@ protected:
 };
 
 }  // namespace mean_compass
+
+#include "utf8_io.hpp"
 
 #endif  // __MEAN_COMPASS_UTF8_IO_H__
