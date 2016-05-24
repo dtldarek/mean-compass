@@ -47,7 +47,7 @@ class UTF8Input {
   };
 
   UTF8Input();  // Use stdin.
-  UTF8Input(const std::string& filename);
+  explicit UTF8Input(const std::string& filename);
 
   UTF8Input(const UTF8Input&) = delete;
   UTF8Input(UTF8Input&&) = delete;
