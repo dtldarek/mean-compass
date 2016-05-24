@@ -1,10 +1,15 @@
 RM=rm -f
-CXXFLAGS= -Wall -MMD -std=c++11 -I/usr/include/eigen3/
+CXXFLAGS=-Wall -Wextra -Wpedantic \
+		 -Wshadow -Wpointer-arith -Wcast-qual \
+		 -Wstrict-overflow=2 -Wlogical-op -Wfloat-equal \
+		 -Wswitch-enum -Wswitch-default -Wredundant-decls \
+		 -fstrict-overflow \
+		 -MMD -std=c++11 -isystem/usr/include/eigen3/
 LDFLAGS=
 LDLIBS=-lmpfr -lgmp -lboost_random -lboost_program_options
 
 SUBDIRS=.depends build
-SRCS=src/utf8_io.cc src/mean_compass.cc src/utils.cc
+SRCS=src/utf8_io.cc src/mean_compass.cc
 OBJS=$(SRCS:src/%.cc=build/%.o)
 
 all: CXXFLAGS += -DNDEBUG -O2

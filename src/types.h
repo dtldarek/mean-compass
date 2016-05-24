@@ -38,14 +38,15 @@ using SparseLU       = Eigen::SparseLU<SparseMatrix, Eigen::COLAMDOrdering<Index
 }  // namespace default_types
 
 template<
+    bool option_use_colors = true,
     typename Index_     = default_types::Index,
     typename Integer_   = default_types::Integer,
     typename Rational_  = default_types::Rational,
     typename Real_      = default_types::Real,
-	// If you use non-default Matrix_, please specify LU_ as well.
+    // If you use non-default Matrix_, please specify LU_ as well.
     typename Matrix_    = Eigen::SparseMatrix<Real_, Eigen::ColMajor, Index_>,
     typename Vector_    = Eigen::Matrix<Real_, Eigen::Dynamic, 1>,
-	// Beware, the default assumes that Matrix_ works with SparseLU.
+    // Beware, the default assumes that Matrix_ works with SparseLU.
     typename LU_        = Eigen::SparseLU<Matrix_, Eigen::COLAMDOrdering<Index_>>,
     typename Weight_    = Real_>
 class Config {
@@ -59,6 +60,7 @@ class Config {
   using Vector     = Vector_;
   using LU         = LU_;
   using Weight     = Weight_;
+  static constexpr bool use_colors = option_use_colors;
 };
 
 }  // namespace mean_compass

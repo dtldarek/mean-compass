@@ -18,19 +18,32 @@
 namespace mean_compass {
 namespace utils {
 
-struct AnsiColors {
-  static constexpr const char* const RED = "\033[91m";
-  static constexpr const char* const GREEN = "\033[92m";
-  static constexpr const char* const YELLOW = "\033[93m";
-  static constexpr const char* const BLUE = "\033[94m";
-  static constexpr const char* const MAGENTA = "\033[95m";
-  static constexpr const char* const CYAN = "\033[96m";
-  static constexpr const char* const WHITE = "\033[97m";
-  static constexpr const char* const GRAY = "\033[90m";
-  static constexpr const char* const ENDC = "\033[0m";
-  static constexpr const char* const BOLD = "\033[1m";
-  static constexpr const char* const UNDERLINE = "\033[4m";
+template<typename Config> struct AnsiColors {
+  static constexpr bool use_colors = Config::use_colors;
+  static constexpr const char* const RED       = use_colors ? "\033[91m" : "";
+  static constexpr const char* const GREEN     = use_colors ? "\033[92m" : "";
+  static constexpr const char* const YELLOW    = use_colors ? "\033[93m" : "";
+  static constexpr const char* const BLUE      = use_colors ? "\033[94m" : "";
+  static constexpr const char* const MAGENTA   = use_colors ? "\033[95m" : "";
+  static constexpr const char* const CYAN      = use_colors ? "\033[96m" : "";
+  static constexpr const char* const WHITE     = use_colors ? "\033[97m" : "";
+  static constexpr const char* const GRAY      = use_colors ? "\033[90m" : "";
+  static constexpr const char* const ENDC      = use_colors ? "\033[0m" : "";
+  static constexpr const char* const BOLD      = use_colors ? "\033[1m" : "";
+  static constexpr const char* const UNDERLINE = use_colors ? "\033[4m" : "";
 };
+
+template<typename Config> constexpr const char* const AnsiColors<Config>::RED;
+template<typename Config> constexpr const char* const AnsiColors<Config>::GREEN;
+template<typename Config> constexpr const char* const AnsiColors<Config>::YELLOW;
+template<typename Config> constexpr const char* const AnsiColors<Config>::BLUE;
+template<typename Config> constexpr const char* const AnsiColors<Config>::MAGENTA;
+template<typename Config> constexpr const char* const AnsiColors<Config>::CYAN;
+template<typename Config> constexpr const char* const AnsiColors<Config>::WHITE;
+template<typename Config> constexpr const char* const AnsiColors<Config>::GRAY;
+template<typename Config> constexpr const char* const AnsiColors<Config>::ENDC;
+template<typename Config> constexpr const char* const AnsiColors<Config>::BOLD;
+template<typename Config> constexpr const char* const AnsiColors<Config>::UNDERLINE;
 
 // For any integer-like type T returns a random number of that type
 // that is uniformly distributed in [0, size).

@@ -22,17 +22,77 @@
 
 namespace {
 
+// We pass all the parameters and options directly.
+// Should there be too many of them, we can put them into Config class.
+template<typename Config> inline int main_with_config(
+    const std::vector<std::string>& input_files,
+    const int option_default_precision) {
+  using namespace mean_compass;
+  using Index   = typename Config::Index;
+  using Real    = typename Config::Real;
+  using Matrix  = typename Config::Matrix;
+  using Vector  = typename Config::Vector;
+  using Triplet = typename Config::Triplet;
+
+  std::cout << utils::AnsiColors<Config>::GREEN
+            << "Starting..."
+			<< utils::AnsiColors<Config>::ENDC << '\n'
+            << std::flush;
+
+  // Do some tests. {{{
+  const size_t size = 100;
+
+  Real::default_precision(option_default_precision);
+  std::cout << std::setprecision(Real::default_precision());
+
+  std::vector<Triplet> triplets;
+  triplets.reserve(10*size);
+  for (size_t ii = 0; ii < 10*size; ++ii) {
+    triplets.push_back(Triplet(
+          utils::unirand<Index>(size),
+          utils::unirand<Index>(size),
+          utils::unirand()));
+  }
+  Matrix A(size, size);
+  A.setFromTriplets(triplets.begin(), triplets.end());
+  A.makeCompressed();
+  Vector b = Vector::Random(size);
+
+  typename Config::LU solver;
+  solver.analyzePattern(A);
+  solver.factorize(A);
+  Vector x = solver.solve(b);
+  std::cout << "relative error: " << (A*x - b).norm() / b.norm() << std::endl;
+  // End doing some tests. }}}
+
+  for (const std::string& input_file : input_files) {
+    std::cout << utils::AnsiColors<Config>::GREEN
+              << "Processing " << input_file
+              << utils::AnsiColors<Config>::ENDC << '\n' << std::flush;
+    Graph<Config> graph((UTF8Input(input_file)));
+    std::cout << graph.n() << '\n';
+    graph.init_state(0.001, 0.001);
+    for (Index ii = 0; ii < graph.n(); ++ii) {
+      std::cout << ' ' << graph.position()(ii);
+    }
+    std::cout << '\n';
+  }
+
+  std::cout << utils::AnsiColors<Config>::GREEN
+            << "Exiting ;-)"
+			<< utils::AnsiColors<Config>::ENDC << '\n'
+            << std::flush;
+
+  return 0;
+}
+
 }  // anonymous namespace
 
+constexpr const char* version_string = "Mean Compass version 0.1.0";
 
 int main(int argc, char** argv) {
   // FIXME: Only the most basic things in main().
   using namespace mean_compass;
-  using MainConfig = Config<>;
-  using Index = MainConfig::Index;
-  using Real = MainConfig::Real;
-  using Matrix = MainConfig::Matrix;
-  using Vector = MainConfig::Vector;
 
   // Parse cmdline flags. {{{
   bool option_verbose = false;
@@ -47,7 +107,7 @@ int main(int argc, char** argv) {
     generic_options.add_options()
       ("help,h", "Print help and usage message.")
       ("verbose,v",
-	        po::value<bool>(&option_verbose),
+	        po::bool_switch(&option_verbose),
 	       "Be more verbose.")
 	  ("color,c",
 	        po::bool_switch(&option_use_colors),
@@ -65,7 +125,7 @@ int main(int argc, char** argv) {
            "Set the default precision of MPFR.")
       ("input-file",
            po::value<std::vector<std::string>>(&input_files)->composing(),
-           "The input files to process.");
+           "The input files to process, can be used multiple times.");
     po::options_description all_options;
     all_options.add(generic_options).add(config_options);
     po::positional_options_description positional_description;
@@ -84,52 +144,27 @@ int main(int argc, char** argv) {
       variables_map.notify();
     }
 
+    if (variables_map.count("version")) {
+      std::cout << version_string << '\n';
+      return 0;
+    }
     if (variables_map.count("help")) {
-      std::cout << all_options << "\n";
+      std::cout << version_string << '\n';
+      std::cout << all_options << '\n';
       return 0;
     }
   } catch (std::exception& e) {
-    std::cout << e.what() << "\n" << std::flush;
+    std::cout << e.what() << '\n' << std::flush;
     return 1;
   }
   // End of parsing cmdline flags }}}
-/*
-  // Do some tests. {{{
-  const size_t size = 100;
 
-  Real::default_precision(option_default_precision);
-  std::cout << std::setprecision(Real::default_precision());
-
-  std::vector<MainConfig::Triplet> triplets;
-  triplets.reserve(10*size);
-  for (size_t ii = 0; ii < 10*size; ++ii) {
-    triplets.push_back(MainConfig::Triplet(
-          utils::unirand<Index>(size),
-          utils::unirand<Index>(size),
-          utils::unirand()));
-  }
-  Matrix A(size, size);
-  A.setFromTriplets(triplets.begin(), triplets.end());
-  A.makeCompressed();
-  Vector b = Vector::Random(size);
-
-  MainConfig::LU solver;
-  solver.analyzePattern(A);
-  solver.factorize(A);
-  Vector x = solver.solve(b);
-  std::cout << "relative error: " << (A*x - b).norm() / b.norm() << std::endl;
-  // End doing some tests. }}}
-*/
-  for (const std::string& input_file : input_files) {
-    std::cout << utils::AnsiColors::GREEN
-              << "Processing " << input_file
-              << utils::AnsiColors::ENDC << '\n' << std::flush;
-    UTF8Input input(input_file);
-    Graph<MainConfig> graph(&input);
-    std::cout << graph.n() << '\n';
+  if (option_use_colors) {
+    return main_with_config<Config<true>>(input_files, option_default_precision);
+  } else {
+    return main_with_config<Config<false>>(input_files, option_default_precision);
   }
 
-  return 0;
 }
 
 // vim: foldmethod=marker

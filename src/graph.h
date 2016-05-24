@@ -35,31 +35,45 @@ class Graph {
 
    protected:
     MinProblem(const Real& barrier_coef,
-               const Real& randdst_coef,
+               const Real& mixing_coef,
                Graph* graph);
     const Real& barrier_coef_;
-    const Real& randdst_coef_;
+    const Real& mixing_coef_;
     Graph* graph_;
     friend Graph;
   };
-  class MaxProblem;
+  class MaxProblem {
+    // TODO: Waiting for the MinProblem to be implemented,
+    //       to see which parts (if any) might be shared.
+  };
 
   /* Parse a graph from the following input format:
 
-        # This is a comment, anything after '#' is ignored.
-        # Empty lines are ingored too.
-        n1 n2 m             # |min_vertices| |max_vertices| |edges|
-        label_u1 weight_u1  # label for the first min-vertex and its weight
-        label_u2 weight_u2
-        ...                 # continue for (n1 - 2) more lines
-        label_v1 weight_v1  # label for the first max-vertex and its weight
-        ...                 # continue for (n2 - 1) more lines
-        label1 label2       # an edge between any two different vertices
-        label3 label4
-        ...                 # continue for (m - 2) more lines
-  */
+       # This is a comment, anything after '#' is ignored.
+       # Empty lines are ingored too.
+       n1 n2 m             # |min_vertices| |max_vertices| |edges|
+       label_u1 weight_u1  # label for the first min-vertex and its weight
+       label_u2 weight_u2
+       ...                 # continue for (n1 - 2) more lines
+       label_v1 weight_v1  # label for the first max-vertex and its weight
+       ...                 # continue for (n2 - 1) more lines
+       label1 label2       # an edge between any two different vertices
+       label3 label4
+       ...                 # continue for (m - 2) more lines
 
-  Graph(UTF8Input* input);
+
+     To avoid long live of the UTF8Input object, one can call it like this:
+
+       Graph my_graph(UTF8Input(filename));
+
+     (note: temporary objects are destroyed at the end of the full expression).
+  */
+  explicit Graph(UTF8Input&& input) : Graph(&input) { }
+  explicit Graph(UTF8Input* input);
+
+  // Initialize the flow matrix, position and targets.
+  void init_state(UTF8Input* input);
+  void init_state(const Real& barrier_coef, const Real& mixing_coef);
 
   Index n()     const { return n_; }
   Index n_min() const { return n_min; }
@@ -76,9 +90,11 @@ class Graph {
 
   const Matrix& flow() const { return flow_; }
   Matrix& flow() { return flow_; }
+  const Vector& position() const { return position_; }
+  Vector& position() { return position_; }
 
-  MinProblem get_min_problem(const Real& barrier_coef);
-  MaxProblem get_max_problem(const Real& barrier_coef);
+  MinProblem get_min_problem(const Real& barrier_coef, const Real& mixing_coef);
+  MaxProblem get_max_problem(const Real& barrier_coef, const Real& mixing_coef);
 
  protected:
   // Number of vertices(n) and edges(m), controlled by player min and max.
@@ -104,7 +120,7 @@ class Graph {
   Vector max_target_;
 
   void init_flow();
-  void init_position();
+  void init_position(const Real& barrier_coef, const Real& mixing_coef);
   void init_targets();
   void update_min_target();
   void update_max_target();
