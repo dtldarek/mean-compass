@@ -7,6 +7,8 @@
  */
 
 #include <stdexcept>
+#include "graph.h"
+
 
 namespace mean_compass {
 
@@ -86,26 +88,27 @@ template<typename Config> void Graph<Config>::init_state(UTF8Input* input) {
   }
   // Non-input-based initializations.
   init_targets();
-  update_min_target();
-  update_max_target();
 }
 template<typename Config> void Graph<Config>::init_state(
     const Real& barrier_coef, const Real& mixing_coef) {
   init_flow();
   init_position(barrier_coef, mixing_coef);
   init_targets();
-  update_min_target();
-  update_max_target();
 }
 template<typename Config> void Graph<Config>::init_flow() {
   flow_.resize(n_, n_);
   flow_.reserve(outdegrees_);
+  min_flow_log_sum_ = 0;
+  max_flow_log_sum_ = 0;
+  // We intialize the flow matrix with uniform split for each vertex.
   for (Index col = 0; col < n_; ++col) {
-    Real equal_split(1.0);
-    equal_split /= outedges_[col].size();
+    Real equal_split = Real(1.0) / outdegrees_[col];
     for (Index row : outedges_[col]) {
       flow_.insert(row, col) = equal_split;
     }
+    // Update {min|max}_flow_log_sum.
+    (col < n_min_? min_flow_log_sum_ : max_flow_log_sum_) +=
+      boost::multiprecision::log(equal_split) * outdegrees_[col];
   }
 }
 template<typename Config> void Graph<Config>::init_position(
@@ -145,46 +148,111 @@ template<typename Config> void Graph<Config>::init_position(
   position_ = solver.solve(vec);
 }
 template<typename Config> void Graph<Config>::init_targets() {
-  std::cout << n_max_ << " " << n_min_ << std::endl;
-  std::cout << m_max_ << " " << m_min_ << std::endl;
   min_target_.resize(n_max_ + m_min_);
+  for (Index ii = 0; ii < n_max_; ++ii) {
+    Index v_max = ii + n_min_;  // The indexes of max vertices start at n_min_;
+    min_target_(ii) = weight_[v_max];
+  }
+  for (Index ii = 0; ii < n_min_; ++ii) {
+    Index v_min = ii;  // The indexes of min vertices start at 0.
+    for (Index jj : outedges_[v_min]) {
+      min_target_(cumulative_outdegrees_[v_min] + jj + n_min_) = weight_[v_min];
+    }
+  }
+
   max_target_.resize(n_min_ + m_max_);
-  update_min_target();
-  update_max_target();
-}
-template<typename Config> void Graph<Config>::update_min_target() {
-  // TODO
-}
-template<typename Config> void Graph<Config>::update_max_target() {
-  // TODO
+  for (Index ii = 0; ii < n_min_; ++ii) {
+    Index v_min = ii;  // The indexes of min vertices start at 0.
+    min_target_(ii) = weight_[v_min];
+  }
+  for (Index ii = 0; ii < n_max_; ++ii) {
+    Index v_max = ii + n_min_;  // The indexes of max vertices start at n_min_;
+    for (Index jj = 0; jj < outdegrees_[v_max]; ++jj) {
+      Index row = cumulative_outdegrees_[v_max] - m_min_ + n_min_ + jj;
+      min_target_(row) = weight_[v_max];
+    }
+  }
 }
 
 template<typename Config> Graph<Config>::MinProblem::MinProblem(
     const Real& barrier_coef, const Real& mixing_coef, Graph* graph) :
     barrier_coef_(barrier_coef), mixing_coef_(mixing_coef), graph_(graph) { }
 
-template<typename Config> void Graph<Config>::MinProblem::init_position(
-    Vector* result) const {
-  static_cast<void>(result);
+template<typename Config>
+typename Graph<Config>::Vector Graph<Config>::MinProblem::init_position() const {
+  typename Config::Vector min_position(graph_->n_max_ + graph_->m_min_);
+  for (Index ii = 0; ii < graph_->n_max_; ++ii) {
+    Index v_max = ii + graph_->n_min_;  // The indexes of max vertices start at n_min_;
+    min_position(ii) = graph_->position_(v_max);
+  }
+  for (Index ii = 0; ii < graph_->n_min_; ++ii) {
+    Index v_min = ii;  // The indexes of min vertices start at 0.
+    for (Index jj = 0; jj < graph_->outdegrees_[v_min]; ++jj) {
+      Index v_head = graph_->outedges_[jj];
+      Index row = graph_->cumulative_outdegrees_[v_min] + jj + graph_->n_min_;
+      min_position(row) = graph_->position(v_min) * graph_->flow_(v_head, v_min);
+    }
+  }
+  return min_position;
 }
-template<typename Config> void Graph<Config>::MinProblem::value(
-    const Vector& position, Real* result) const {
-  static_cast<void>(position);
-  static_cast<void>(result);
+template<typename Config>
+typename Graph<Config>::Real Graph<Config>::MinProblem::value(
+    const Vector& min_position) const {
+  Real result = 0;
+  Real barrier = graph_->min_flow_log_sum_;
+  for (Index ii = 0; ii < graph_->n_max_; ++ii) {
+    Index v_max = ii + graph_->n_min_;
+    result += min_position(ii) * graph_->min_target_(ii);
+    barrier += boost::multiprecision::log(min_position(ii)) * graph_->outdegrees_[v_max];
+  }
+  for (Index ii = graph_->n_max_; ii < graph_->n_max_ + graph_->m_min_; ++ii) {
+    result += min_position(ii) * graph_->min_target_(ii);
+    barrier += boost::multiprecision::log(min_position(ii));
+  }
+  result -= barrier * barrier_coef_;
+  return result;
 }
-template<typename Config> void Graph<Config>::MinProblem::gradient(
-    const Vector& position, Vector* result) const {
-  static_cast<void>(position);
-  static_cast<void>(result);
+template<typename Config>
+typename Graph<Config>::Vector Graph<Config>::MinProblem::gradient(
+    const Vector& min_position) const {
+  Vector result = graph_->min_target_;
+  for (Index ii = 0; ii < graph_->n_max_; ++ii) {
+    Index v_max = ii + graph_->n_min_;
+    result(ii) += -Real(graph_->outdegrees_[v_max]) / min_position(ii) * barrier_coef_;
+  }
+  for (Index ii = graph_->n_max_; ii < graph_->n_max_ + graph_->m_min_; ++ii) {
+    result(ii) += -Real(1) / min_position(ii) * barrier_coef_;
+  }
+  return result;
 }
-template<typename Config> void Graph<Config>::MinProblem::hessian(
-    const Vector& position, Matrix* result) const {
-  static_cast<void>(position);
-  static_cast<void>(result);
+template<typename Config>
+typename Graph<Config>::Diagonal Graph<Config>::MinProblem::hessian(
+    const Vector& min_position) const {
+  Vector result(graph_->n_max_ + graph_->m_min_);
+  for (Index ii = 0; ii < graph_->n_max_; ++ii) {
+    Index v_max = ii + graph_->n_min_;
+    result(ii) += Real(graph_->outdegrees_[v_max]) /
+      min_position(ii) / min_position(ii) * barrier_coef_;
+  }
+  for (Index ii = graph_->n_max_; ii < graph_->n_max_ + graph_->m_min_; ++ii) {
+    result(ii) += Real(1) / min_position(ii) / min_position(ii) * barrier_coef_;
+  }
+}
+template<typename Config>
+typename Graph<Config>::Vector Graph<Config>::MinProblem::equality_vector(
+    ) const {
+  Vector result;
+  return result;
+}
+template<typename Config>
+typename Graph<Config>::Matrix Graph<Config>::MinProblem::equality_matrix(
+    ) const {
+  Matrix result;
+  return result;
 }
 template<typename Config> void Graph<Config>::MinProblem::update(
-    const Vector& position) {
-  static_cast<void>(position);
+    const Vector& min_position) {
+  static_cast<void>(min_position);
 }
 
 }  // namespace mean_compass

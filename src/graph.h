@@ -19,19 +19,22 @@ namespace mean_compass {
 template<typename Config>
 class Graph {
  public:
-  using Index  = typename Config::Index;
-  using Real   = typename Config::Real;
-  using Matrix = typename Config::Matrix;
-  using Vector = typename Config::Vector;
-  using Weight = typename Config::Weight;
+  using Index    = typename Config::Index;
+  using Real     = typename Config::Real;
+  using Matrix   = typename Config::Matrix;
+  using Vector   = typename Config::Vector;
+  using Weight   = typename Config::Weight;
+  using Diagonal = typename Config::Diagonal;
 
   class MinProblem {
    public:
-    void init_position(Vector* position) const;
-    void value(const Vector& position, Real* result) const;
-    void gradient(const Vector& position, Vector* result) const;
-    void hessian(const Vector& position, Matrix* result) const;
-    void update(const Vector& position);
+    Vector init_position() const;
+    Real value(const Vector& min_position) const;
+    Vector gradient(const Vector& min_position) const;
+    Diagonal hessian(const Vector& min_position) const;
+    Vector equality_vector() const;
+    Matrix equality_matrix() const;
+    void update(const Vector& min_position);
 
    protected:
     MinProblem(const Real& barrier_coef,
@@ -49,22 +52,22 @@ class Graph {
 
   /* Parse a graph from the following input format:
 
-       # This is a comment, anything after '#' is ignored.
-       # Empty lines are ingored too.
-       n1 n2 m             # |min_vertices| |max_vertices| |edges|
-       label_u1 weight_u1  # label for the first min-vertex and its weight
-       label_u2 weight_u2
-       ...                 # continue for (n1 - 2) more lines
-       label_v1 weight_v1  # label for the first max-vertex and its weight
-       ...                 # continue for (n2 - 1) more lines
-       label1 label2       # an edge between any two different vertices
-       label3 label4
-       ...                 # continue for (m - 2) more lines
+         # This is a comment, anything after '#' is ignored.
+         # Empty lines are ingored too.
+         n1 n2 m             # |min_vertices| |max_vertices| |edges|
+         label_u1 weight_u1  # label for the first min-vertex and its weight
+         label_u2 weight_u2
+         ...                 # continue for (n1 - 2) more lines
+         label_v1 weight_v1  # label for the first max-vertex and its weight
+         ...                 # continue for (n2 - 1) more lines
+         label1 label2       # an edge between any two different vertices
+         label3 label4
+         ...                 # continue for (m - 2) more lines
 
 
      To avoid long live of the UTF8Input object, one can call it like this:
 
-       Graph my_graph(UTF8Input(filename));
+         Graph my_graph(UTF8Input(filename));
 
      (note: temporary objects are destroyed at the end of the full expression).
   */
@@ -100,30 +103,47 @@ class Graph {
   // Number of vertices(n) and edges(m), controlled by player min and max.
   Index n_, n_min_, n_max_;
   Index m_, m_min_, m_max_;
-  std::unordered_map<std::string, Index> index_;
-  std::vector<std::string> label_;
-  std::vector<std::vector<Index>> inedges_;
-  std::vector<std::vector<Index>> outedges_;
-  std::vector<Index> outdegrees_;
-  std::vector<Index> cumulative_outdegrees_;
-  std::vector<Weight> weight_;
+
+  std::unordered_map<std::string, Index>  index_;
+  std::vector<std::string>                label_;
+  std::vector<std::vector<Index>>         inedges_;
+  std::vector<std::vector<Index>>         outedges_;
+  std::vector<Index>                      outdegrees_;
+  std::vector<Index>                      cumulative_outdegrees_;
+  std::vector<Weight>                     weight_;
+
   // The matrix representing the split of flow.
-  // The cell dist[row,col] corresponds to v_col -> v_row,
+  // The cell flow[row,col] corresponds to v_col -> v_row, (note the reverse),
   // in particular the matrix is row-stochastic.
-  // Non-zero value means an edge in the graph
-  // (this value may be _very_ small, but has to be positive).
-  // If the defaults were not overriden, then the Matrix type
-  // stores value in column-major order.
+  //
+  // Non-zero value means an edge in the graph (this value may be _very_ small,
+  // but has to be positive). If the defaults were not overriden, then the
+  // Matrix type stores value in column-major order.
   Matrix flow_;
+
+  // Roughly min_flow_log_sum = sum_{v_min} sum_{neigh} log(v_min -> neigh).
+  // More precisely, suppose that a + b + c = 1 describe a flow split at some
+  // vertex, then
+  // log(flow * a) + log(flow * b) + log(flow * c) =
+  //   3 * log(flow) + log(a) + log(b) + log(c).
+  // The component log(a)+... does not change, so we
+  // recalculate it don't have to recalculate it every time.
+  Real min_flow_log_sum_;
+  Real max_flow_log_sum_;
+
+  // The i-th cell describes the probability of being at vertex v_i.
   Vector position_;
+
+  // The components of min_position and min_target are as follows:
+  //  * n_max cells corresponding to max vertices,
+  //  * m_min cells corresponding to min edges.
+  // For max_position and max_target we start with n_min and then m_max.
   Vector min_target_;
   Vector max_target_;
 
   void init_flow();
   void init_position(const Real& barrier_coef, const Real& mixing_coef);
   void init_targets();
-  void update_min_target();
-  void update_max_target();
 
   friend MinProblem;
   friend MaxProblem;

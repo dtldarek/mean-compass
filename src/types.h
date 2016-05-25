@@ -30,6 +30,7 @@ using Triplet        = Eigen::Triplet<Real>;
 using DenseMatrix    = Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
 using DenseVector    = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
 using SparseMatrix   = Eigen::SparseMatrix<Real, Eigen::ColMajor, Index>;
+using DiagonalMatrix = Eigen::DiagonalMatrix<Real, Eigen::Dynamic, Eigen::Dynamic>;
 // The parameter 0 denotes that no flag is used.
 using SparseVector   = Eigen::SparseVector<Real, 0, Index>;
 
@@ -45,6 +46,7 @@ template<
     typename Real_      = default_types::Real,
     // If you use non-default Matrix_, please specify LU_ as well.
     typename Matrix_    = Eigen::SparseMatrix<Real_, Eigen::ColMajor, Index_>,
+	typename Diagonal_  = Eigen::DiagonalMatrix<Real_, Eigen::Dynamic, Eigen::Dynamic>,
     typename Vector_    = Eigen::Matrix<Real_, Eigen::Dynamic, 1>,
     // Beware, the default assumes that Matrix_ works with SparseLU.
     typename LU_        = Eigen::SparseLU<Matrix_, Eigen::COLAMDOrdering<Index_>>,
@@ -56,6 +58,7 @@ class Config {
   using Rational   = Rational_;
   using Real       = Real_;
   using Matrix     = Matrix_;
+  using Diagonal   = Diagonal_;
   using Triplet    = Eigen::Triplet<Real>;
   using Vector     = Vector_;
   using LU         = LU_;
