@@ -58,6 +58,7 @@ template<typename Config> Graph<Config>::Graph(UTF8Input* input) {
     std::sort(inedges_[ii].begin(), inedges_[ii].end());
     std::sort(outedges_[ii].begin(), outedges_[ii].end());
     m_min_ += outedges_[ii].size();
+    outdegrees_[ii] = outedges_[ii].size();
     Index next_sum = cumulative_outdegrees_.back() + outedges_[ii].size();
     cumulative_outdegrees_.push_back(next_sum);
   }
@@ -155,8 +156,9 @@ template<typename Config> void Graph<Config>::init_targets() {
   }
   for (Index ii = 0; ii < n_min_; ++ii) {
     Index v_min = ii;  // The indexes of min vertices start at 0.
-    for (Index jj : outedges_[v_min]) {
-      min_target_(cumulative_outdegrees_[v_min] + jj + n_min_) = weight_[v_min];
+    for (Index jj = 0; jj < outdegrees_[v_min]; ++jj) {
+      Index row = cumulative_outdegrees_[v_min] - 0 + n_max_ + jj;
+      min_target_(row) = weight_[v_min];
     }
   }
 
