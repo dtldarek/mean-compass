@@ -40,8 +40,8 @@ template<typename Config> Graph<Config>::Graph(UTF8Input* input) {
   }
   // Read edges. Currently there are no edge-weights.
   for (Index ii = 0; ii < m_; ++ii) {
-    Index v_1 = index(input->get_string());
-    Index v_2 = index(input->get_string());
+    const Index v_1 = index(input->get_string());
+    const Index v_2 = index(input->get_string());
     if (v_1 == v_2) {
       std::stringstream description;
       description << "Encountered a loop edge: "
@@ -59,7 +59,7 @@ template<typename Config> Graph<Config>::Graph(UTF8Input* input) {
     std::sort(outedges_[ii].begin(), outedges_[ii].end());
     m_min_ += outedges_[ii].size();
     outdegrees_[ii] = outedges_[ii].size();
-    Index next_sum = cumulative_outdegrees_.back() + outedges_[ii].size();
+    const Index next_sum = cumulative_outdegrees_.back() + outedges_[ii].size();
     cumulative_outdegrees_.push_back(next_sum);
   }
   // Postprocessing for the max player (edge sorting, outdegrees).
@@ -69,7 +69,7 @@ template<typename Config> Graph<Config>::Graph(UTF8Input* input) {
     std::sort(outedges_[ii].begin(), outedges_[ii].end());
     m_max_ += outedges_[ii].size();
     outdegrees_[ii] = outedges_[ii].size();
-    Index next_sum = cumulative_outdegrees_.back() + outedges_[ii].size();
+    const Index next_sum = cumulative_outdegrees_.back() + outedges_[ii].size();
     cumulative_outdegrees_.push_back(next_sum);
   }
 }
@@ -151,26 +151,27 @@ template<typename Config> void Graph<Config>::init_position(
 template<typename Config> void Graph<Config>::init_targets() {
   min_target_.resize(n_max_ + m_min_);
   for (Index ii = 0; ii < n_max_; ++ii) {
-    Index v_max = ii + n_min_;  // The indexes of max vertices start at n_min_;
+    const Index v_max = ii + n_min_;  // The indexes of max vertices start at n_min_;
     min_target_(ii) = weight_[v_max];
   }
   for (Index ii = 0; ii < n_min_; ++ii) {
-    Index v_min = ii;  // The indexes of min vertices start at 0.
+    const Index v_min = ii;  // The indexes of min vertices start at 0.
     for (Index jj = 0; jj < outdegrees_[v_min]; ++jj) {
-      Index row = cumulative_outdegrees_[v_min] - 0 + n_max_ + jj;
+      const Index row = n_max_ + cumulative_outdegrees_[v_min] - 0 + jj;
       min_target_(row) = weight_[v_min];
     }
   }
 
+  // We do not negate max_target here.
   max_target_.resize(n_min_ + m_max_);
   for (Index ii = 0; ii < n_min_; ++ii) {
-    Index v_min = ii;  // The indexes of min vertices start at 0.
+    const Index v_min = ii;  // The indexes of min vertices start at 0.
     min_target_(ii) = weight_[v_min];
   }
   for (Index ii = 0; ii < n_max_; ++ii) {
-    Index v_max = ii + n_min_;  // The indexes of max vertices start at n_min_;
+    const Index v_max = ii + n_min_;  // The indexes of max vertices start at n_min_;
     for (Index jj = 0; jj < outdegrees_[v_max]; ++jj) {
-      Index row = cumulative_outdegrees_[v_max] - m_min_ + n_min_ + jj;
+      const Index row = n_min_ + cumulative_outdegrees_[v_max] - m_min_ + jj;
       min_target_(row) = weight_[v_max];
     }
   }
@@ -178,21 +179,24 @@ template<typename Config> void Graph<Config>::init_targets() {
 
 template<typename Config> Graph<Config>::MinProblem::MinProblem(
     const Real& barrier_coef, const Real& mixing_coef, Graph* graph) :
-    barrier_coef_(barrier_coef), mixing_coef_(mixing_coef), graph_(graph) { }
+    barrier_coef_(barrier_coef),
+    mixing_coef_(mixing_coef),
+    non_mixing_coef_(Real(1.0) - mixing_coef_),
+    graph_(graph) { }
 
 template<typename Config>
 typename Graph<Config>::Vector Graph<Config>::MinProblem::init_position() const {
   typename Config::Vector min_position(graph_->n_max_ + graph_->m_min_);
   for (Index ii = 0; ii < graph_->n_max_; ++ii) {
-    Index v_max = ii + graph_->n_min_;  // The indexes of max vertices start at n_min_;
+    const Index v_max = ii + graph_->n_min_;  // The indexes of max vertices start at n_min_;
     min_position(ii) = graph_->position_(v_max);
   }
   for (Index ii = 0; ii < graph_->n_min_; ++ii) {
-    Index v_min = ii;  // The indexes of min vertices start at 0.
+    const Index v_min = ii;  // The indexes of min vertices start at 0.
     for (Index jj = 0; jj < graph_->outdegrees_[v_min]; ++jj) {
-      Index v_head = graph_->outedges_[jj];
-      Index row = graph_->cumulative_outdegrees_[v_min] + jj + graph_->n_min_;
-      min_position(row) = graph_->position(v_min) * graph_->flow_(v_head, v_min);
+      const Index v_head = graph_->outedges_[jj];
+      const Index row = graph_->cumulative_outdegrees_[v_min] + jj + graph_->n_min_;
+      min_position(row) = graph_->position_(v_min) * graph_->flow_(v_head, v_min);
     }
   }
   return min_position;
@@ -203,7 +207,7 @@ typename Graph<Config>::Real Graph<Config>::MinProblem::value(
   Real result = 0;
   Real barrier = graph_->min_flow_log_sum_;
   for (Index ii = 0; ii < graph_->n_max_; ++ii) {
-    Index v_max = ii + graph_->n_min_;
+    const Index v_max = ii + graph_->n_min_;
     result += min_position(ii) * graph_->min_target_(ii);
     barrier += boost::multiprecision::log(min_position(ii)) * graph_->outdegrees_[v_max];
   }
@@ -219,7 +223,7 @@ typename Graph<Config>::Vector Graph<Config>::MinProblem::gradient(
     const Vector& min_position) const {
   Vector result = graph_->min_target_;
   for (Index ii = 0; ii < graph_->n_max_; ++ii) {
-    Index v_max = ii + graph_->n_min_;
+    const Index v_max = ii + graph_->n_min_;
     result(ii) += -Real(graph_->outdegrees_[v_max]) / min_position(ii) * barrier_coef_;
   }
   for (Index ii = graph_->n_max_; ii < graph_->n_max_ + graph_->m_min_; ++ii) {
@@ -232,30 +236,300 @@ typename Graph<Config>::Diagonal Graph<Config>::MinProblem::hessian(
     const Vector& min_position) const {
   Vector result(graph_->n_max_ + graph_->m_min_);
   for (Index ii = 0; ii < graph_->n_max_; ++ii) {
-    Index v_max = ii + graph_->n_min_;
+    const Index v_max = ii + graph_->n_min_;
     result(ii) += Real(graph_->outdegrees_[v_max]) /
       min_position(ii) / min_position(ii) * barrier_coef_;
   }
   for (Index ii = graph_->n_max_; ii < graph_->n_max_ + graph_->m_min_; ++ii) {
     result(ii) += Real(1) / min_position(ii) / min_position(ii) * barrier_coef_;
   }
-}
-template<typename Config>
-typename Graph<Config>::Vector Graph<Config>::MinProblem::equality_vector(
-    ) const {
-  Vector result;
-  return result;
+  return (-result).asDiagonal();
 }
 template<typename Config>
 typename Graph<Config>::Matrix Graph<Config>::MinProblem::equality_matrix(
     ) const {
-  Matrix result;
+  /* The basic equality matrix A we are encoding looks equals
+   *
+   *          <-- v_max -->     <-- e_min -->
+   *
+   *     / [in these columns | -1 -1 -1             <--- if deg(v_min_0) = 3
+   *    /  [ each cell +=    |          -1 -1       <--- if deg(v_min_1) = 2
+   * v_min [ flow from v_max |                ...
+   *    \  [ to v_row, i.e., |                    -1
+   *     \ [ flow(row,col)   |                       -1 -1 -1 -1
+   *       [-----------------+----------------------------------
+   *     / [ -1              |
+   *    /  [    -1           |  in these columns each cell += 1.0
+   * v_max [       ...       |  if it represents an edge e_min
+   *    \  [           -1    |  that ends at v_row
+   *     \ [              -1 |
+   *
+   * However, we modify it using the mixing coeficient, that is, we use
+   *
+   *   non_mixing_coef * A - mixing_coef * J
+   *
+   * Where J is the kind-of identity matrix which ensures the -1's above
+   * stay equal to -1.0 (that is, J would be identity if we were to sort it
+   * and process vertices only, instead of max-vertices and min-edges).
+   *
+   * Finally, we substitute the last row, with [1.0, 1.0, 1.0, ..., 1.0], so
+   * that it represents the sum of all the variables.
+   */
+
+  using Triplet = typename Config::Triplet;
+  std::vector<Triplet> triplets;
+  // WARNING: implementation dependent optimization.
+  // The outer loop iterates column-related _vertices_(not exact columns).
+  Index col_min = graph_->n_max_;  // No const.
+  for (Index ii = 0; ii < graph_->n_; ++ii) {
+    if (ii < graph_->n_max_) {
+      const Index v_max = ii + graph_->n_min_;
+      const Index col = ii;
+      // The inner loop iterates over some rows.
+      for (typename Matrix::InnerIterator it(graph_->flow_, v_max); it; ++it) {
+        if (it.row() != graph_->n_) {
+          // Out-flow from v_max to v_row.
+          triplets.push_back(Triplet(it.row(), col, it.value() * non_mixing_coef_));
+        }
+      }
+      // In-flow of v_max.
+      if (v_max != graph_->n_ - 1) {
+        triplets.push_back(Triplet(v_max, col, -1.0));
+      }
+      // Add the 1.0 in the last row.
+      triplets.push_back(Triplet(graph_->n_ - 1, col, 1.0));
+    } else {
+      const Index v_min = ii - graph_->n_max_;
+      // Here we iterate over out-edges, which means
+      // we know both the row and the colum.
+      // For each column we have at most 3 values:
+      //   * the out-flow of current edge,
+      //   * the in-flow of the tail vertex,
+      //   * the 1.0 in the last row.
+      for (Index v_row : graph_->outedges_[v_min]) {
+        // Here `col_min` is actually the column.
+        if (v_row != graph_->n_ - 1) {
+          // Out-flow from v_min via e_min to v_row.
+          triplets.push_back(Triplet(v_row, col_min, non_mixing_coef_));
+        }
+        // In-flow of v_min, i.e., the sum of all related e_min.
+        triplets.push_back(Triplet(v_min, col_min, -1.0));
+        // The last row value.
+        triplets.push_back(Triplet(graph_->n_ - 1, col_min, 1.0));
+        col_min++;
+      }
+    }
+  }
+  Matrix result(graph_->n_, graph_->n_max + graph_->m_min_);
+  result.setFromTriplets(triplets.begin(), triplets.end());
+  result.makeCompressed();
+  return result;
+}
+template<typename Config>
+typename Graph<Config>::Vector Graph<Config>::MinProblem::equality_vector(
+    ) const {
+  /* The basic equality vector would be equal to [0, 0, 0, ..., 0, 0, 1],
+   * but because of the mixing_coeficient, we get that:
+   *   * the non-last-row value is equal to non_mixing_coef * mixing_coef / n,
+   *   * the last-row value is equal to non_mixing_coef.
+   */
+  Vector result = Vector::Constant(graph_->n_, mixing_coef_ / graph_->n_ * -non_mixing_coef_);
+  result(graph_->n_ - 1) = non_mixing_coef_;
   return result;
 }
 template<typename Config> void Graph<Config>::MinProblem::update(
     const Vector& min_position) {
-  static_cast<void>(min_position);
+  for (Index ii = 0; ii < graph_->n_max_; ++ii) {
+    const Index v_max = ii + graph_->n_min_;
+    graph_->position_(v_max) = min_position(ii);
+  }
+  for (Index ii = 0; ii < graph_->n_min_; ++ii) {
+    const Index v_min = ii;  // The indexes of min vertices start at 0.
+    graph_->position_(v_min) = 0;
+    for (Index jj = 0; jj < graph_->outdegrees_[v_min]; ++jj) {
+      const Index row = graph_->n_max_ + graph_->cumulative_outdegrees_[v_min] - 0 + jj;
+      graph_->position_(v_min) += min_position(row);
+    }
+    for (Index jj = 0; jj < graph_->outdegrees_[v_min]; ++jj) {
+      const Index v_head = graph_->outedges_[jj];
+      const Index row = graph_->n_max_ + graph_->cumulative_outdegrees_[v_min] - 0 + jj;
+      graph_->flow_.coeffRef(v_head, v_min) = min_position(row) / graph_->position_(v_min);
+    }
+  }
 }
+
+// There is a lot of code share between MinProblem and MaxProblem, but
+// there are tons of small changes, which makes it (at least now) infeasible.
+template<typename Config> Graph<Config>::MaxProblem::MaxProblem(
+    const Real& barrier_coef, const Real& mixing_coef, Graph* graph) :
+    barrier_coef_(barrier_coef),
+    mixing_coef_(mixing_coef),
+    non_mixing_coef_(Real(1.0) - mixing_coef_),
+    graph_(graph) { }
+
+template<typename Config>
+typename Graph<Config>::Vector Graph<Config>::MaxProblem::init_position() const {
+  typename Config::Vector max_position(graph_->n_min_ + graph_->m_max_);
+  for (Index ii = 0; ii < graph_->n_min_; ++ii) {
+    const Index v_min = ii;  // The indexes of min vertices start at 0.
+    max_position(ii) = graph_->position_(v_min);
+  }
+  for (Index ii = 0; ii < graph_->n_max_; ++ii) {
+    const Index v_max = ii + graph_->n_min_;  // The indexes of max vertices start at n_min_.
+    for (Index jj = 0; jj < graph_->outdegrees_[v_max]; ++jj) {
+      const Index v_head = graph_->outedges_[jj];
+      const Index row = graph_->cumulative_outdegrees_[v_max] + jj + graph_->n_max_;
+      max_position(row) = graph_->position_(v_max) * graph_->flow_(v_head, v_max);
+    }
+  }
+  return max_position;
+}
+template<typename Config>
+typename Graph<Config>::Real Graph<Config>::MaxProblem::value(
+    const Vector& max_position) const {
+  Real result = 0;
+  Real barrier = graph_->max_flow_log_sum_;
+  for (Index ii = 0; ii < graph_->n_min_; ++ii) {
+    const Index v_min = ii;
+    result += max_position(ii) * graph_->max_target_(ii);
+    barrier += boost::multiprecision::log(max_position(ii)) * graph_->outdegrees_[v_min];
+  }
+  for (Index ii = graph_->n_min_; ii < graph_->n_min_ + graph_->m_max_; ++ii) {
+    result += max_position(ii) * graph_->max_target_(ii);
+    barrier += boost::multiprecision::log(max_position(ii));
+  }
+  result -= barrier * barrier_coef_;
+  return -result;
+}
+template<typename Config>
+typename Graph<Config>::Vector Graph<Config>::MaxProblem::gradient(
+    const Vector& max_position) const {
+  Vector result = graph_->max_target_;
+  for (Index ii = 0; ii < graph_->n_min_; ++ii) {
+    const Index v_min = ii + graph_->n_max_;
+    result(ii) += -Real(graph_->outdegrees_[v_min]) / max_position(ii) * barrier_coef_;
+  }
+  for (Index ii = graph_->n_min_; ii < graph_->n_min_ + graph_->m_max_; ++ii) {
+    result(ii) += -Real(1) / max_position(ii) * barrier_coef_;
+  }
+  return -result;
+}
+template<typename Config>
+typename Graph<Config>::Diagonal Graph<Config>::MaxProblem::hessian(
+    const Vector& max_position) const {
+  Vector result(graph_->n_min_ + graph_->m_max_);
+  for (Index ii = 0; ii < graph_->n_min_; ++ii) {
+    const Index v_min = ii + graph_->n_max_;
+    result(ii) += Real(graph_->outdegrees_[v_min]) /
+      max_position(ii) / max_position(ii) * barrier_coef_;
+  }
+  for (Index ii = graph_->n_min_; ii < graph_->n_min_ + graph_->m_max_; ++ii) {
+    result(ii) += Real(1) / max_position(ii) / max_position(ii) * barrier_coef_;
+  }
+  return (-result).asDiagonal();
+}
+template<typename Config>
+typename Graph<Config>::Matrix Graph<Config>::MaxProblem::equality_matrix(
+    ) const {
+  /* The basic equality matrix A looks similar to the one in
+   * MinProblem::equality_matrix (notice the reordering of columns
+   * to match max_position):
+   *
+   *          <-- v_min -->     <-- e_max -->
+   *
+   *     / [ -1              |
+   *    /  [    -1           |  in these columns each cell += 1.0
+   * v_min [       ...       |  if it represents an edge e_max
+   *    \  [           -1    |  that ends at v_row
+   *     \ [              -1 |
+   *       [-----------------+----------------------------------
+   *     / [in these columns | -1 -1 -1             <--- if deg(v_max_0) = 3
+   *    /  [ each cell +=    |          -1 -1       <--- if deg(v_max_1) = 2
+   * v_max [ flow from v_min |                ...
+   *    \  [ to v_row, i.e., |                    -1
+   *     \ [ flow(row,col)   |                       -1 -1 -1 -1
+   *
+   */
+
+  using Triplet = typename Config::Triplet;
+  std::vector<Triplet> triplets;
+  // WARNING: implementation dependent optimization.
+  // The outer loop iterates column-related _vertices_(not exact columns).
+  Index col_max = graph_->n_min_;  // No const.
+  for (Index ii = 0; ii < graph_->n_; ++ii) {
+    if (ii < graph_->n_min_) {
+      const Index v_min = ii;
+      const Index col = ii;
+      // The inner loop iterates over some rows.
+      for (typename Matrix::InnerIterator it(graph_->flow_, v_min); it; ++it) {
+        if (it.row() != graph_->n_) {
+          // Out-flow from v_min to v_row.
+          triplets.push_back(Triplet(it.row(), col, it.value() * non_mixing_coef_));
+        }
+      }
+      // In-flow of v_min.
+      if (v_min != graph_->n_ - 1) {
+        triplets.push_back(Triplet(v_min, col, -1.0));
+      }
+      // Add the 1.0 in the last row.
+      triplets.push_back(Triplet(graph_->n_ - 1, col, 1.0));
+    } else {
+      const Index v_max = ii;
+      // Here we iterate over out-edges, which means
+      // we know both the row and the colum.
+      // For each column we have at most 3 values:
+      //   * the out-flow of current edge,
+      //   * the in-flow of the tail vertex,
+      //   * the 1.0 in the last row.
+      for (Index v_row : graph_->outedges_[v_max]) {
+        // Here `col_max` is actually the column.
+        if (v_row != graph_->n_ - 1) {
+          // Out-flow from v_max via e_max to v_row.
+          triplets.push_back(Triplet(v_row, col_max, non_mixing_coef_));
+        }
+        // In-flow of v_max, i.e., the sum of all related e_max.
+        triplets.push_back(Triplet(v_max, col_max, -1.0));
+        // The last row value.
+        triplets.push_back(Triplet(graph_->n_ - 1, col_max, 1.0));
+        col_max++;
+      }
+    }
+  }
+  Matrix result(graph_->n_, graph_->n_min + graph_->m_max_);
+  result.setFromTriplets(triplets.begin(), triplets.end());
+  result.makeCompressed();
+  return result;
+}
+template<typename Config>
+typename Graph<Config>::Vector Graph<Config>::MaxProblem::equality_vector(
+    ) const {
+  // See the comment at MinProblem::equality_vector.
+  Vector result = Vector::Constant(graph_->n_, mixing_coef_ / graph_->n_ * -non_mixing_coef_);
+  result(graph_->n_ - 1) = non_mixing_coef_;
+  return result;
+}
+template<typename Config> void Graph<Config>::MaxProblem::update(
+    const Vector& max_position) {
+  for (Index ii = 0; ii < graph_->n_min_; ++ii) {
+    const Index v_min = ii;
+    graph_->position_(v_min) = max_position(ii);
+  }
+  for (Index ii = 0; ii < graph_->n_max_; ++ii) {
+    const Index v_max = ii + graph_->n_min_;
+    graph_->position_(v_max) = 0;
+    for (Index jj = 0; jj < graph_->outdegrees_[v_max]; ++jj) {
+      const Index row = graph_->n_min_ + graph_->cumulative_outdegrees_[v_max] - graph_->m_min_ + jj;
+      graph_->position_(v_max) += max_position(row);
+    }
+    for (Index jj = 0; jj < graph_->outdegrees_[v_max]; ++jj) {
+      const Index v_head = graph_->outedges_[jj];
+      const Index row = graph_->n_min_ + graph_->cumulative_outdegrees_[v_max] - graph_->m_min_ + jj;
+      graph_->flow_.coeffRef(v_head, v_max) = max_position(row) / graph_->position_(v_max);
+    }
+  }
+}
+
 
 }  // namespace mean_compass
 
+// vim: foldmethod=syntax

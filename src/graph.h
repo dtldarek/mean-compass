@@ -42,35 +42,54 @@ class Graph {
                Graph* graph);
     const Real& barrier_coef_;
     const Real& mixing_coef_;
+	const Real& non_mixing_coef_;
     Graph* graph_;
     friend Graph;
   };
+  // A lot of code between MinProblem and MaxProblem could have been shared,
+  // but there are many small changes and I couldn't find a good way to do it.
   class MaxProblem {
-    // TODO: Waiting for the MinProblem to be implemented,
-    //       to see which parts (if any) might be shared.
+   public:
+    Vector init_position() const;
+    Real value(const Vector& max_position) const;
+    Vector gradient(const Vector& max_position) const;
+    Diagonal hessian(const Vector& max_position) const;
+    Vector equality_vector() const;
+    Matrix equality_matrix() const;
+    void update(const Vector& max_position);
+
+   protected:
+    MaxProblem(const Real& barrier_coef,
+               const Real& mixing_coef,
+               Graph* graph);
+    const Real& barrier_coef_;
+    const Real& mixing_coef_;
+	const Real& non_mixing_coef_;
+    Graph* graph_;
+    friend Graph;
   };
 
   /* Parse a graph from the following input format:
-
-         # This is a comment, anything after '#' is ignored.
-         # Empty lines are ingored too.
-         n1 n2 m             # |min_vertices| |max_vertices| |edges|
-         label_u1 weight_u1  # label for the first min-vertex and its weight
-         label_u2 weight_u2
-         ...                 # continue for (n1 - 2) more lines
-         label_v1 weight_v1  # label for the first max-vertex and its weight
-         ...                 # continue for (n2 - 1) more lines
-         label1 label2       # an edge between any two different vertices
-         label3 label4
-         ...                 # continue for (m - 2) more lines
-
-
-     To avoid long live of the UTF8Input object, one can call it like this:
-
-         Graph my_graph(UTF8Input(filename));
-
-     (note: temporary objects are destroyed at the end of the full expression).
-  */
+   *
+   *     # This is a comment, anything after '#' is ignored.
+   *     # Empty lines are ingored too.
+   *     n1 n2 m             # |min_vertices| |max_vertices| |edges|
+   *     label_u1 weight_u1  # label for the first min-vertex and its weight
+   *     label_u2 weight_u2
+   *     ...                 # continue for (n1 - 2) more lines
+   *     label_v1 weight_v1  # label for the first max-vertex and its weight
+   *     ...                 # continue for (n2 - 1) more lines
+   *     label1 label2       # an edge between any two different vertices
+   *     label3 label4
+   *     ...                 # continue for (m - 2) more lines
+   *
+   *
+   * To avoid long live of the UTF8Input object, one can call it like this:
+   *
+   *     Graph my_graph(UTF8Input(filename));
+   *
+   * (note: temporary objects are destroyed at the end of the full expression).
+   */
   explicit Graph(UTF8Input&& input) : Graph(&input) { }
   explicit Graph(UTF8Input* input);
 
