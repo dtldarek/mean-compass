@@ -6,6 +6,7 @@
  *
  */
 
+#include "utf8_io.h"
 #include <vector>
 
 namespace mean_compass {

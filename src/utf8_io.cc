@@ -100,8 +100,7 @@ char32_t UTF8Input::get_char() {
     } else {
       std::stringstream description;
       description << "Encountered invalid initial UTF-8 character: 0x"
-        << ((u & 0xF0) >> 4) + 'A'
-        << ((u & 0x0F) >> 0) + 'A';
+                  << std::hex << std::setfill(ZERO) << (u & 0xFF);
       throw std::runtime_error(description.str());
     }
     for (int ii = 0; ii < size; ++ii) {
@@ -110,12 +109,11 @@ char32_t UTF8Input::get_char() {
       if (c == std::char_traits<char>::eof()) {
         throw std::runtime_error("Encountered EOF while reading an UTF-8 symbol");
       } else if ((u & 0xC0) == 0x80) {
-        u_result = (u_result << 6) + (u & 0x3f);
+        u_result = (u_result << 6) + (u & 0x3F);
       } else {
         std::stringstream description;
         description << "Encountered invalid UTF-8 character: 0x"
-          << ((u & 0xF0) >> 4) + 'A'
-          << ((u & 0x0F) >> 0) + 'A';
+                    << std::hex << std::setfill(ZERO) << (u & 0xFF);
         throw std::runtime_error(description.str());
       }
     }
