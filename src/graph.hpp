@@ -235,7 +235,7 @@ typename Graph<Config>::Vector Graph<Config>::MinProblem::gradient(
 template<typename Config>
 typename Graph<Config>::Diagonal Graph<Config>::MinProblem::hessian(
     const Vector& min_position) const {
-  Vector result(graph_->n_max_ + graph_->m_min_);
+  Vector result = Vector::Zero(graph_->n_max_ + graph_->m_min_);
   for (Index ii = 0; ii < graph_->n_max_; ++ii) {
     const Index v_max = ii + graph_->n_min_;
     result(ii) += Real(graph_->outdegrees_[v_max]) /
@@ -418,7 +418,7 @@ typename Graph<Config>::Vector Graph<Config>::MaxProblem::gradient(
 template<typename Config>
 typename Graph<Config>::Diagonal Graph<Config>::MaxProblem::hessian(
     const Vector& max_position) const {
-  Vector result(graph_->n_min_ + graph_->m_max_);
+  Vector result = Vector::Zero(graph_->n_min_ + graph_->m_max_);
   for (Index ii = 0; ii < graph_->n_min_; ++ii) {
     const Index v_min = ii + graph_->n_max_;
     result(ii) += Real(graph_->outdegrees_[v_min]) /
