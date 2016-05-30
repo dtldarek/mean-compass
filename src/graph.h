@@ -36,6 +36,8 @@ class Graph {
     Matrix equality_matrix() const;
     void update(const Vector& min_position);
 
+	Real epsilon() const;
+
    protected:
     MinProblem(const Real& barrier_coef,
                const Real& mixing_coef,
@@ -57,6 +59,8 @@ class Graph {
     Vector equality_vector() const;
     Matrix equality_matrix() const;
     void update(const Vector& max_position);
+
+	Real epsilon() const;
 
    protected:
     MaxProblem(const Real& barrier_coef,
