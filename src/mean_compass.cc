@@ -16,6 +16,7 @@
 #include <vector>
 #include <boost/program_options.hpp>
 #include "graph.h"
+#include "newton.h"
 #include "types.h"
 #include "utils.h"
 #include "utf8_io.h"
@@ -36,7 +37,7 @@ template<typename Config> inline int main_with_config(
 
   std::cout << utils::AnsiColors<Config>::GREEN
             << "Starting..."
-			<< utils::AnsiColors<Config>::ENDC << '\n'
+            << utils::AnsiColors<Config>::ENDC << '\n'
             << std::flush;
 
   // Do some tests. {{{
@@ -76,11 +77,19 @@ template<typename Config> inline int main_with_config(
       std::cout << ' ' << graph.position()(ii);
     }
     std::cout << '\n';
+
+    typename Graph<Config>::MinProblem min_problem = graph.get_min_problem(0.5, 0.5);
+    SimpleNewton<Config, typename Graph<Config>::MinProblem> min_newton(&min_problem);
+    min_newton.loop();
+    for (Index ii = 0; ii < min_newton.position().size(); ++ii) {
+      std::cout << ' ' << min_newton.position()(ii);
+    }
+    std::cout << '\n';
   }
 
   std::cout << utils::AnsiColors<Config>::GREEN
             << "Exiting ;-)"
-			<< utils::AnsiColors<Config>::ENDC << '\n'
+            << utils::AnsiColors<Config>::ENDC << '\n'
             << std::flush;
 
   return 0;
@@ -107,11 +116,11 @@ int main(int argc, char** argv) {
     generic_options.add_options()
       ("help,h", "Print help and usage message.")
       ("verbose,v",
-	        po::bool_switch(&option_verbose),
-	       "Be more verbose.")
-	  ("color,c",
-	        po::bool_switch(&option_use_colors),
-			"Use ANSI terminal colors.")
+            po::bool_switch(&option_verbose),
+            "Be more verbose.")
+      ("color,c",
+            po::bool_switch(&option_use_colors),
+            "Use ANSI terminal colors.")
       ("version", "Print version of the program.")
       ("config-file",
            po::value<std::string>(&option_config_file_name),

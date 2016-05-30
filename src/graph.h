@@ -36,15 +36,15 @@ class Graph {
     Matrix equality_matrix() const;
     void update(const Vector& min_position);
 
-	Real epsilon() const;
+    Real epsilon() const { return std::numeric_limits<Real>::epsilon() * 10; }
 
    protected:
     MinProblem(const Real& barrier_coef,
                const Real& mixing_coef,
                Graph* graph);
-    const Real& barrier_coef_;
-    const Real& mixing_coef_;
-	const Real& non_mixing_coef_;
+    Real barrier_coef_;
+    Real mixing_coef_;
+    Real non_mixing_coef_;
     Graph* graph_;
     friend Graph;
   };
@@ -60,15 +60,15 @@ class Graph {
     Matrix equality_matrix() const;
     void update(const Vector& max_position);
 
-	Real epsilon() const;
+    Real epsilon() const { return std::numeric_limits<Real>::epsilon() * 10; }
 
    protected:
     MaxProblem(const Real& barrier_coef,
                const Real& mixing_coef,
                Graph* graph);
-    const Real& barrier_coef_;
-    const Real& mixing_coef_;
-	const Real& non_mixing_coef_;
+    Real barrier_coef_;
+    Real mixing_coef_;
+    Real non_mixing_coef_;
     Graph* graph_;
     friend Graph;
   };
@@ -119,8 +119,12 @@ class Graph {
   const Vector& position() const { return position_; }
   Vector& position() { return position_; }
 
-  MinProblem get_min_problem(const Real& barrier_coef, const Real& mixing_coef);
-  MaxProblem get_max_problem(const Real& barrier_coef, const Real& mixing_coef);
+  MinProblem get_min_problem(const Real& barrier_coef, const Real& mixing_coef) {
+    return MinProblem(barrier_coef, mixing_coef, this);
+  }
+  MaxProblem get_max_problem(const Real& barrier_coef, const Real& mixing_coef) {
+    return MaxProblem(barrier_coef, mixing_coef, this);
+  }
 
  protected:
   // Number of vertices(n) and edges(m), controlled by player min and max.

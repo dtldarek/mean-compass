@@ -193,10 +193,11 @@ typename Graph<Config>::Vector Graph<Config>::MinProblem::init_position() const 
   }
   for (Index ii = 0; ii < graph_->n_min_; ++ii) {
     const Index v_min = ii;  // The indexes of min vertices start at 0.
+	const std::vector<Index>& current_outedges = graph_->outedges_[v_min];
     for (Index jj = 0; jj < graph_->outdegrees_[v_min]; ++jj) {
-      const Index v_head = graph_->outedges_[jj];
+      const Index v_head = current_outedges[jj];
       const Index row = graph_->cumulative_outdegrees_[v_min] + jj + graph_->n_min_;
-      min_position(row) = graph_->position_(v_min) * graph_->flow_(v_head, v_min);
+      min_position(row) = graph_->position_(v_min) * graph_->flow_.coeff(v_head, v_min);
     }
   }
   return min_position;
@@ -320,7 +321,7 @@ typename Graph<Config>::Matrix Graph<Config>::MinProblem::equality_matrix(
       }
     }
   }
-  Matrix result(graph_->n_, graph_->n_max + graph_->m_min_);
+  Matrix result(graph_->n_, graph_->n_max_ + graph_->m_min_);
   result.setFromTriplets(triplets.begin(), triplets.end());
   result.makeCompressed();
   return result;

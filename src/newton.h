@@ -80,25 +80,28 @@ class SimpleNewton {
   Real step(Vector* dual) {
     auto hessian = problem_->hessian(position_);
     // We can do this safely, because in our situation H is diagonal.
-    auto hessian_inv = hessian.invert();
+    auto hessian_inv = hessian.inverse();
     auto gradient = problem_->gradient(position_);
     auto mid_mat = equality_matrix_ * hessian_inv;
-    auto schur_complement = -mid_mat * equality_matrix_.T();
+    auto schur_complement = -mid_mat * equality_matrix_.transpose();
     auto infeasibility = equality_matrix_ * position_ - equality_vector_;
     typename Config::LU solver;
     solver.compute(schur_complement);
     *dual = solver.solve(mid_mat * gradient - infeasibility);
-    Vector step = -hessian_inv * (equality_matrix_.T() * *dual + gradient);
+    Vector step = hessian_inv * (equality_matrix_.transpose() * *dual + gradient) * (-1);
     // Bactracking line search with alpha=1 and tau=0.5 and c=0.125
     // This parameters should be obtainable from config/command line.
     Real old_value = problem_->value(position_);
-    Real min_diff = 0.125 * gradient.T() * step;
+    Real min_diff = gradient.transpose() * step;
+    min_diff /= 8;
     while (true) {
       Vector new_position = position_ + step;
       if (new_position.minCoeff() > 0.0 &&
         problem_->value(new_position) + min_diff <= old_value) {
         position_ = new_position;
-        return step.T() * hessian * step / 2 + infeasibility.T() * infeasibility;
+        Real r1 = step.transpose() * hessian * step;
+        Real r2 = infeasibility.transpose() * infeasibility;
+        return r1 / 2 + r2;
       } else {
         // Normally one prefers *= over /=, but when /=2 (note 2 instead of 2.0)
         // has much better performance than *= 0.5 or *= Real(0.5).
@@ -109,7 +112,7 @@ class SimpleNewton {
   }
 
   Real residual2(const Vector& primal, const Vector& dual) const {
-    Vector r1 = problem_->gradient(primal) + equality_matrix_.T() * dual;
+    Vector r1 = problem_->gradient(primal) + equality_matrix_.transpose() * dual;
     Vector r2 = equality_matrix_ * position_ - equality_vector_;
     Real result = 0;
     for (Index ii = 0; ii < r1.size(); ++ii) {
