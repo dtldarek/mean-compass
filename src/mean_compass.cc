@@ -78,7 +78,7 @@ template<typename Config> inline int main_with_config(
     }
     std::cout << '\n';
 
-    typename Graph<Config>::MinProblem min_problem = graph.get_min_problem(0.5, 0.5);
+    typename Graph<Config>::MinProblem min_problem = graph.get_min_problem(0.01, 0.01);
     SimpleNewton<Config, typename Graph<Config>::MinProblem> min_newton(&min_problem);
     min_newton.loop();
     for (Index ii = 0; ii < min_newton.position().size(); ++ii) {

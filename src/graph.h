@@ -36,7 +36,7 @@ class Graph {
     Matrix equality_matrix() const;
     void update(const Vector& min_position);
 
-    Real epsilon() const { return std::numeric_limits<Real>::epsilon() * 10; }
+    Real epsilon() const { return boost::multiprecision::pow(Real(0.1), Real::default_precision()-1); }
 
    protected:
     MinProblem(const Real& barrier_coef,
@@ -60,7 +60,7 @@ class Graph {
     Matrix equality_matrix() const;
     void update(const Vector& max_position);
 
-    Real epsilon() const { return std::numeric_limits<Real>::epsilon() * 10; }
+    Real epsilon() const { return boost::multiprecision::pow(Real(0.1), Real::default_precision()-1); }
 
    protected:
     MaxProblem(const Real& barrier_coef,

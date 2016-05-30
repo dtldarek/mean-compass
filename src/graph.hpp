@@ -244,7 +244,7 @@ typename Graph<Config>::Diagonal Graph<Config>::MinProblem::hessian(
   for (Index ii = graph_->n_max_; ii < graph_->n_max_ + graph_->m_min_; ++ii) {
     result(ii) += Real(1) / min_position(ii) / min_position(ii) * barrier_coef_;
   }
-  return (-result).asDiagonal();
+  return result.asDiagonal();
 }
 template<typename Config>
 typename Graph<Config>::Matrix Graph<Config>::MinProblem::equality_matrix(
@@ -427,7 +427,7 @@ typename Graph<Config>::Diagonal Graph<Config>::MaxProblem::hessian(
   for (Index ii = graph_->n_min_; ii < graph_->n_min_ + graph_->m_max_; ++ii) {
     result(ii) += Real(1) / max_position(ii) / max_position(ii) * barrier_coef_;
   }
-  return (-result).asDiagonal();
+  return result.asDiagonal();
 }
 template<typename Config>
 typename Graph<Config>::Matrix Graph<Config>::MaxProblem::equality_matrix(
