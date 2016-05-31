@@ -36,7 +36,7 @@ class Graph {
     Matrix equality_matrix() const;
     void update(const Vector& min_position);
 
-    Real epsilon() const { return boost::multiprecision::pow(Real(0.1), Real::default_precision()-1); }
+    Real epsilon() const { return graph_->epsilon_; }
 
    protected:
     MinProblem(const Real& barrier_coef,
@@ -60,7 +60,7 @@ class Graph {
     Matrix equality_matrix() const;
     void update(const Vector& max_position);
 
-    Real epsilon() const { return boost::multiprecision::pow(Real(0.1), Real::default_precision()-1); }
+    Real epsilon() const { return graph_->epsilon_; }
 
    protected:
     MaxProblem(const Real& barrier_coef,
@@ -101,12 +101,13 @@ class Graph {
   void init_state(UTF8Input* input);
   void init_state(const Real& barrier_coef, const Real& mixing_coef);
 
-  Index n()     const { return n_; }
-  Index n_min() const { return n_min; }
-  Index n_max() const { return n_max; }
-  Index m()     const { return m_; }
-  Index m_min() const { return m_min; }
-  Index m_max() const { return m_max; }
+  Index n()       const { return n_; }
+  Index n_min()   const { return n_min; }
+  Index n_max()   const { return n_max; }
+  Index m()       const { return m_; }
+  Index m_min()   const { return m_min; }
+  Index m_max()   const { return m_max; }
+  Real  epsilon() const { return epsilon_; }
   Index index(const std::string& label) const { return index_.at(label); }
 
   const std::string& label(Index index) const { return *label_[index]; }
@@ -130,6 +131,7 @@ class Graph {
   // Number of vertices(n) and edges(m), controlled by player min and max.
   Index n_, n_min_, n_max_;
   Index m_, m_min_, m_max_;
+  Real epsilon_;
 
   std::unordered_map<std::string, Index>  index_;
   std::vector<std::string>                label_;
