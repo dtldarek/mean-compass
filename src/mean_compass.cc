@@ -23,6 +23,41 @@
 
 namespace {
 
+template<typename Config> inline void handle_graph(mean_compass::Graph<Config>&& graph_) {
+  using namespace mean_compass;
+  using Index   = typename Config::Index;
+  using Real    = typename Config::Real;
+  using Vector  = typename Config::Vector;
+
+  Graph<Config> graph(graph_);
+
+  std::cout << graph.n() << '\n';
+  graph.init_state(0.001, 0.001);
+  for (Index ii = 0; ii < graph.n(); ++ii) {
+    std::cout << ' ' << graph.position()(ii);
+  }
+  std::cout << '\n';
+
+  Vector old_position = Vector::Constant(graph.n(), 0);
+  for (Real barrier_coef = 0.1; barrier_coef >= graph.epsilon(); barrier_coef *= 0.99) {
+    do {
+      old_position = graph.position();
+      typename Graph<Config>::MinProblem min_problem = graph.get_min_problem(barrier_coef, 0.01);
+      SimpleNewton<Config, typename Graph<Config>::MinProblem> min_newton(&min_problem);
+      min_newton.loop();
+      min_problem.update(min_newton.position());
+      std::cout << "min: " << std::fixed << graph.position().transpose() << '\n' << std::scientific;
+
+      typename Graph<Config>::MaxProblem max_problem = graph.get_max_problem(barrier_coef, 0.01);
+      SimpleNewton<Config, typename Graph<Config>::MaxProblem> max_newton(&max_problem);
+      max_newton.loop();
+      max_problem.update(max_newton.position());
+      std::cout << "max: " << std::fixed << graph.position().transpose() << '\n' << std::scientific;
+    } while ((graph.position() - old_position).norm() > graph.epsilon());
+    std::cout << "barrier: " << barrier_coef << '\n';
+  }
+}
+
 // We pass all the parameters and options directly.
 // Should there be too many of them, we can put them into Config class.
 template<typename Config> inline int main_with_config(
@@ -44,7 +79,6 @@ template<typename Config> inline int main_with_config(
   const size_t size = 100;
 
   Real::default_precision(option_default_precision);
-  std::cout << std::setprecision(Real::default_precision());
 
   std::vector<Triplet> triplets;
   triplets.reserve(10*size);
@@ -66,25 +100,18 @@ template<typename Config> inline int main_with_config(
   std::cout << "relative error: " << (A*x - b).norm() / b.norm() << std::endl;
   // End doing some tests. }}}
 
-  for (const std::string& input_file : input_files) {
-    std::cout << utils::AnsiColors<Config>::GREEN
-              << "Processing " << input_file
-              << utils::AnsiColors<Config>::ENDC << '\n' << std::flush;
-    Graph<Config> graph((UTF8Input(input_file)));
-    std::cout << graph.n() << '\n';
-    graph.init_state(0.001, 0.001);
-    for (Index ii = 0; ii < graph.n(); ++ii) {
-      std::cout << ' ' << graph.position()(ii);
+  if (input_files.size() == 0) {
+      std::cout << utils::AnsiColors<Config>::GREEN
+        << "Processing stdin"
+        << utils::AnsiColors<Config>::ENDC << '\n' << std::flush;
+      handle_graph(Graph<Config>(UTF8Input()));
+  } else {
+    for (const std::string& input_file : input_files) {
+      std::cout << utils::AnsiColors<Config>::GREEN
+        << "Processing " << input_file
+        << utils::AnsiColors<Config>::ENDC << '\n' << std::flush;
+      handle_graph(Graph<Config>(UTF8Input(input_file)));
     }
-    std::cout << '\n';
-
-    typename Graph<Config>::MinProblem min_problem = graph.get_min_problem(0.01, 0.01);
-    SimpleNewton<Config, typename Graph<Config>::MinProblem> min_newton(&min_problem);
-    min_newton.loop();
-    for (Index ii = 0; ii < min_newton.position().size(); ++ii) {
-      std::cout << ' ' << min_newton.position()(ii);
-    }
-    std::cout << '\n';
   }
 
   std::cout << utils::AnsiColors<Config>::GREEN
@@ -109,6 +136,8 @@ int main(int argc, char** argv) {
   std::string option_config_file_name;
   std::vector<std::string> input_files;
   int option_default_precision = 256;
+  int option_display_precision = 4;
+  std::cout << std::setprecision(option_display_precision);
 
   try {
     namespace po = boost::program_options;
@@ -132,6 +161,10 @@ int main(int argc, char** argv) {
            po::value<int>(&option_default_precision)->notifier(
              utils::check_range<int, 2, std::numeric_limits<int>::max()>),
            "Set the default precision of MPFR.")
+      ("display-precision,d",
+           po::value<int>(&option_display_precision)->notifier(
+             utils::check_range<int, 2, std::numeric_limits<int>::max()>),
+           "Set the precision of the output.")
       ("input-file",
            po::value<std::vector<std::string>>(&input_files)->composing(),
            "The input files to process, can be used multiple times.");
@@ -152,7 +185,6 @@ int main(int argc, char** argv) {
           variables_map);
       variables_map.notify();
     }
-
     if (variables_map.count("version")) {
       std::cout << version_string << '\n';
       return 0;
@@ -161,6 +193,12 @@ int main(int argc, char** argv) {
       std::cout << version_string << '\n';
       std::cout << all_options << '\n';
       return 0;
+    }
+    if (variables_map.count("default-precision")) {
+      std::cout << std::setprecision(option_default_precision);
+    }
+    if (variables_map.count("display-precision")) {
+      std::cout << std::setprecision(option_display_precision);
     }
   } catch (std::exception& e) {
     std::cout << e.what() << '\n' << std::flush;
