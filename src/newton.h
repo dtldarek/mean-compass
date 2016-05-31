@@ -78,35 +78,33 @@ class SimpleNewton {
 
   //
   Real step(Vector* dual) {
-    auto hessian = problem_->hessian(position_);
-    // We can do this safely, because in our situation H is diagonal.
-    auto hessian_inv = hessian.inverse();
-    auto gradient = problem_->gradient(position_);
-    auto mid_mat = equality_matrix_ * hessian_inv;
-    auto schur_complement = -mid_mat * equality_matrix_.transpose();
-    auto infeasibility = equality_matrix_ * position_ - equality_vector_;
+    typename Config::Diagonal hessian = problem_->hessian(position_);
+    typename Config::Diagonal hessian_inv = hessian.inverse();
+    Vector gradient = problem_->gradient(position_);
+    Matrix mid_mat = equality_matrix_ * hessian_inv;
+    Matrix schur_complement = -mid_mat * equality_matrix_.transpose();
+    Vector infeasibility = equality_matrix_ * position_ - equality_vector_;
     typename Config::LU solver;
     solver.compute(schur_complement);
-    *dual = solver.solve(mid_mat * gradient - infeasibility);
-    Vector step = hessian_inv * (equality_matrix_.transpose() * *dual + gradient) * (-1);
-    // Bactracking line search with alpha=1 and tau=0.5 and c=0.125
-    // This parameters should be obtainable from config/command line.
-    Real old_value = problem_->value(position_);
-    Real min_diff = gradient.transpose() * step;
-    min_diff /= 8;
+    Vector new_dual = solver.solve(mid_mat * gradient - infeasibility);
+    Vector step = hessian_inv * (equality_matrix_.transpose() * new_dual + gradient) * (-1);
+    Vector dual_step = new_dual - *dual;
+    Real alt = 0.01;
     while (true) {
       Vector new_position = position_ + step;
+      new_dual = *dual + dual_step;
+      Vector blabla = equality_matrix_ * new_position - equality_vector_;
       if (new_position.minCoeff() > 0.0 &&
-        problem_->value(new_position) + min_diff <= old_value) {
+        residual(new_position, new_dual) <= (Real(1) - alt) * residual(position_, *dual)) {
         position_ = new_position;
-        Real r1 = step.transpose() * hessian * step;
-        Real r2 = infeasibility.transpose() * infeasibility;
-        return r1 / 2 + r2;
+        *dual = new_dual;
+        return residual(position_, *dual);
       } else {
-        // Normally one prefers *= over /=, but when /=2 (note 2 instead of 2.0)
+        // Normally one prefers *= over /=, but /=2 (note 2 instead of 2.0)
         // has much better performance than *= 0.5 or *= Real(0.5).
         step /= 2;
-        min_diff /= 2;
+        dual_step /= 2;
+        alt /= 2;
       }
     }
   }
@@ -130,9 +128,11 @@ class SimpleNewton {
   }
 
   void loop() {
-    Vector dual;
-    Real epsilon2 = problem_->epsilon() * problem_->epsilon();
-    while (step(&dual) >= epsilon2) { }
+    Vector dual = Vector::Constant(equality_matrix_.rows(), 1);
+    Real yet = 0;
+    do {
+      yet = step(&dual);
+    } while (yet > problem_->epsilon());
   }
 
  protected:
