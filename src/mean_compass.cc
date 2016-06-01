@@ -117,37 +117,53 @@ template<typename Config> inline void handle_graph(mean_compass::Graph<Config>&&
   std::sort(v_positive.begin(), v_positive.end());
   std::sort(v_negative.begin(), v_negative.end());
   if (v_negative.size() > 0) {
-    std::cout << "Player min wins from nodes:\n"
+    std::cout << "Player " << utils::AnsiColors<Config>::YELLOW
+              << "min" << utils::AnsiColors<Config>::ENDC
+              << " wins from nodes:\n"
               << "  {" << graph.label(v_negative[0]);
     for (Index ii = 1; ii < static_cast<Index>(v_negative.size()); ++ii) {
       std::cout << ", " << graph.label(v_negative[ii]);
     }
-    std::cout << "}\n"
-              << "with strategy\n"
-              << "  [" << graph.label(0)
-              << "->" << graph.label(strategy[0]);
-    for (Index ii = 1; ii < graph.n_min(); ++ii) {
-      std::cout << "," << graph.label(ii)
-                << "->" << graph.label(strategy[ii]);
-    }
-    std::cout << "]\n";
+    std::cout << "}\n";
+  } else {
+    std::cout << "Player " << utils::AnsiColors<Config>::YELLOW
+              << "min" << utils::AnsiColors<Config>::ENDC
+              << " wins from nodes:\n"
+              << "  {}\n";
   }
+  std::cout << "with strategy\n"
+            << "  [" << graph.label(0)
+            << "->" << graph.label(strategy[0]);
+  for (Index ii = 1; ii < graph.n_min(); ++ii) {
+    std::cout << "," << graph.label(ii)
+      << "->" << graph.label(strategy[ii]);
+  }
+  std::cout << "]\n";
   if (v_positive.size() > 0) {
-    std::cout << "Player max wins from nodes:\n"
+    std::cout << "Player " << utils::AnsiColors<Config>::YELLOW
+              << "max" << utils::AnsiColors<Config>::ENDC
+              << " wins from nodes:\n"
               << "  {" << graph.label(v_positive[0]);
     for (Index ii = 1; ii < static_cast<Index>(v_positive.size()); ++ii) {
       std::cout << ", " << graph.label(v_positive[ii]);
     }
-    std::cout << "}\n"
-              << "with strategy\n"
-              << "  [" << graph.label(graph.n_min())
-              << "->" << graph.label(strategy[graph.n_min()]);
-    for (Index ii = graph.n_min() + 1; ii < graph.n(); ++ii) {
-      std::cout << "," << graph.label(ii)
-                << "->" << graph.label(strategy[ii]);
-    }
-    std::cout << "]\n";
+    std::cout << "}\n";
+  } else {
+    std::cout << "Player " << utils::AnsiColors<Config>::YELLOW
+              << "max" << utils::AnsiColors<Config>::ENDC
+              << " wins from nodes:\n"
+              << "  {}\n";
+
   }
+  std::cout << "with strategy\n"
+            << "  [" << graph.label(graph.n_min())
+            << "->" << graph.label(strategy[graph.n_min()]);
+  for (Index ii = graph.n_min() + 1; ii < graph.n(); ++ii) {
+    std::cout << "," << graph.label(ii)
+              << "->" << graph.label(strategy[ii]);
+  }
+  std::cout << "]\n";
+
   std::cout << '\n' << std::flush;
 }
 
