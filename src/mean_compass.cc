@@ -39,23 +39,116 @@ template<typename Config> inline void handle_graph(mean_compass::Graph<Config>&&
   std::cout << '\n';
 
   Vector old_position = Vector::Constant(graph.n(), 0);
-  for (Real barrier_coef = 0.1; barrier_coef >= graph.epsilon(); barrier_coef *= 0.99) {
+  Vector min_dual = Vector::Constant(graph.n(), 1);
+  Vector max_dual = Vector::Constant(graph.n(), 1);
+  for (Real barrier_coef = Real(10000.0) / graph.epsilon(); barrier_coef >= graph.epsilon(); barrier_coef /= 2) {
+    std::cout << "barrier: " << barrier_coef << ' ';
     do {
+      std::cout << '.';
       old_position = graph.position();
       typename Graph<Config>::MinProblem min_problem = graph.get_min_problem(barrier_coef, 0.01);
       SimpleNewton<Config, typename Graph<Config>::MinProblem> min_newton(&min_problem);
-      min_newton.loop();
+      min_newton.step(&min_dual);
+      min_newton.step(&min_dual);
+      min_newton.step(&min_dual);
+      //while (min_newton.step(&min_dual) > min_problem.epsilon()) { std::cout << '.'; }
       min_problem.update(min_newton.position());
-      std::cout << "min: " << std::fixed << graph.position().transpose() << '\n' << std::scientific;
+      //std::cout << "min: " << std::fixed << graph.position().transpose() << '\n' << std::scientific;
 
       typename Graph<Config>::MaxProblem max_problem = graph.get_max_problem(barrier_coef, 0.01);
       SimpleNewton<Config, typename Graph<Config>::MaxProblem> max_newton(&max_problem);
-      max_newton.loop();
+      max_newton.step(&max_dual);
+      max_newton.step(&max_dual);
+      max_newton.step(&max_dual);
+      //while (max_newton.step(&max_dual) > max_problem.epsilon()) { std::cout << '.'; }
       max_problem.update(max_newton.position());
-      std::cout << "max: " << std::fixed << graph.position().transpose() << '\n' << std::scientific;
+      //std::cout << "max: " << std::fixed << graph.position().transpose() << '\n' << std::scientific;
     } while ((graph.position() - old_position).norm() > graph.epsilon());
-    std::cout << "barrier: " << barrier_coef << '\n';
+    std::cout << '\n';
   }
+
+  // Discretize strategy and calculate the sign of infinite games.
+
+  std::vector<Index> v_positive;
+  std::vector<Index> v_negative;
+  std::vector<Index> strategy(graph.n(), graph.n()+1);
+  std::vector<typename Graph<Config>::Weight>  score(graph.n(), 0);
+  std::vector<Index> visited(graph.n(), 0);
+  std::vector<Index> path;
+  path.reserve(graph.n()+2);
+  for (Index ii = 0; ii < graph.n(); ++ii) {
+    strategy[ii] = graph.outedges(ii)[0];
+    for (Index outedge : graph.outedges(ii)) {
+      if (graph.flow().coeff(outedge, ii) > graph.flow().coeff(strategy[ii], ii)) {
+        strategy[ii] = outedge;
+      }
+    }
+  }
+  for (Index ii = 0; ii < graph.n(); ++ii) {
+    if (visited[ii] != 0) continue;
+    path.push_back(ii);
+    while (visited[path.back()] == 0) {
+      visited[path.back()] = 1;
+      path.push_back(strategy[path.back()]);
+    }
+    if (visited[path.back()] == 1) {  // The score wasn't calculated yet.
+      score[path.back()] = graph.weight(path.back());
+      for (Index jj = path.size()-2; path[jj] != path.back(); --jj) {
+        score[path.back()] += graph.weight(path[jj]);
+      }
+      assert(score[path.back()] != 0);
+      visited[path.back()] = 2;  // This vertex will be pushed back next loop.
+    }
+    if (visited[path.back()] == 2) {  // Has a score.
+      for (Index jj : path) {
+        visited[jj] = 2;
+        score[jj] = score[path.back()];
+      }
+      if (score[path.back()] > 0) {
+        path.pop_back();
+        v_positive.insert(v_positive.end(), path.begin(), path.end());
+      } else {
+        path.pop_back();
+        v_negative.insert(v_negative.end(), path.begin(), path.end());
+      }
+    }
+    path.clear();
+  }
+  std::sort(v_positive.begin(), v_positive.end());
+  std::sort(v_negative.begin(), v_negative.end());
+  if (v_negative.size() > 0) {
+    std::cout << "Player min wins from nodes:\n"
+              << "  {" << graph.label(v_negative[0]);
+    for (Index ii = 1; ii < static_cast<Index>(v_negative.size()); ++ii) {
+      std::cout << ", " << graph.label(v_negative[ii]);
+    }
+    std::cout << "}\n"
+              << "with strategy\n"
+              << "  [" << graph.label(0)
+              << "->" << graph.label(strategy[0]);
+    for (Index ii = 1; ii < graph.n_min(); ++ii) {
+      std::cout << "," << graph.label(ii)
+                << "->" << graph.label(strategy[ii]);
+    }
+    std::cout << "]\n";
+  }
+  if (v_positive.size() > 0) {
+    std::cout << "Player max wins from nodes:\n"
+              << "  {" << graph.label(v_positive[0]);
+    for (Index ii = 1; ii < static_cast<Index>(v_positive.size()); ++ii) {
+      std::cout << ", " << graph.label(v_positive[ii]);
+    }
+    std::cout << "}\n"
+              << "with strategy\n"
+              << "  [" << graph.label(graph.n_min())
+              << "->" << graph.label(strategy[graph.n_min()]);
+    for (Index ii = graph.n_min() + 1; ii < graph.n(); ++ii) {
+      std::cout << "," << graph.label(ii)
+                << "->" << graph.label(strategy[ii]);
+    }
+    std::cout << "]\n";
+  }
+  std::cout << '\n' << std::flush;
 }
 
 // We pass all the parameters and options directly.
@@ -133,6 +226,7 @@ int main(int argc, char** argv) {
   // Parse cmdline flags. {{{
   bool option_verbose = false;
   bool option_use_colors = false;
+  bool option_parity = false;
   std::string option_config_file_name;
   std::vector<std::string> input_files;
   int option_default_precision = 256;
@@ -157,6 +251,9 @@ int main(int argc, char** argv) {
     po::options_description config_options("Configuration");
     config_options.add_options()
       // We use int, because program_options parses "-5" with unsigned types.
+      ("parity-game,g",
+           po::bool_switch(&option_parity),
+           "The input graph specifies a parity game, even=max")
       ("default-precision,p",
            po::value<int>(&option_default_precision)->notifier(
              utils::check_range<int, 2, std::numeric_limits<int>::max()>),
@@ -206,10 +303,16 @@ int main(int argc, char** argv) {
   }
   // End of parsing cmdline flags }}}
 
-  if (option_use_colors) {
-    return main_with_config<Config<true>>(input_files, option_default_precision);
+  if (!option_use_colors && !option_parity) {
+    return main_with_config<Config<false, false>>(input_files, option_default_precision);
+  } else if (!option_use_colors && option_parity) {
+    return main_with_config<Config<false, true>>(input_files, option_default_precision);
+  } else if (option_use_colors && !option_parity) {
+    return main_with_config<Config<true, false>>(input_files, option_default_precision);
+  } else if (option_use_colors && option_parity) {
+    return main_with_config<Config<true, true>>(input_files, option_default_precision);
   } else {
-    return main_with_config<Config<false>>(input_files, option_default_precision);
+    assert(false);
   }
 
 }

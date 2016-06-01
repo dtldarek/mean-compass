@@ -20,6 +20,13 @@ template<typename Config> Graph<Config>::Graph(UTF8Input* input) {
 
   n_ = n_min_ + n_max_;
 
+  int log2 = 0;
+  Weight pow2 = 1;
+  while (pow2 <= n_) {
+    pow2 *= 2;
+    log2 += 1;
+  }
+
   // We resize the containers for better memory efficiency.
   label_.resize(n_);       // We use `resize` instead of `reserve`,
   inedges_.resize(n_);     // because we want the basic objects constructed,
@@ -39,16 +46,26 @@ template<typename Config> Graph<Config>::Graph(UTF8Input* input) {
   for (Index ii = 0; ii < n_; ++ii) {
     input->get(&label_[ii]);
     index_[label_[ii]] = ii;
-    input->get(&weight_[ii]);
-	const Real& abs_weight = boost::multiprecision::abs(weight_[ii]);
-	if (abs_weight > 0 && max_abs_weight == 0) {
-		min_abs_weight = abs_weight;
-		max_abs_weight = abs_weight;
-	} else if (abs_weight > 0 && min_abs_weight > abs_weight) {
-		min_abs_weight = abs_weight;
-	} else if (abs_weight > 0 && max_abs_weight < abs_weight) {
-		max_abs_weight = abs_weight;
-	}
+    if (Config::parity) {  // The weight is actually a parity game priority.
+      int priority;
+      input->get(&priority);
+      // TODO: Depends on the type of Weight.
+      weight_[ii] = boost::multiprecision::ldexp(Weight(1.0), priority * log2);
+      if (priority & 0x01) {  // The priority is odd.
+        weight_[ii] *= -1;  // Odd is min.
+      }
+    } else {
+      input->get(&weight_[ii]);
+    }
+    const Real& abs_weight = boost::multiprecision::abs(weight_[ii]);
+    if (abs_weight > 0 && max_abs_weight == 0) {
+      min_abs_weight = abs_weight;
+      max_abs_weight = abs_weight;
+    } else if (abs_weight > 0 && min_abs_weight > abs_weight) {
+      min_abs_weight = abs_weight;
+    } else if (abs_weight > 0 && max_abs_weight < abs_weight) {
+      max_abs_weight = abs_weight;
+    }
   }
 
   // TODO: is this enough?
@@ -209,7 +226,7 @@ typename Graph<Config>::Vector Graph<Config>::MinProblem::init_position() const 
   }
   for (Index ii = 0; ii < graph_->n_min_; ++ii) {
     const Index v_min = ii;  // The indexes of min vertices start at 0.
-	const std::vector<Index>& current_outedges = graph_->outedges_[v_min];
+    const std::vector<Index>& current_outedges = graph_->outedges_[v_min];
     for (Index jj = 0; jj < graph_->outdegrees_[v_min]; ++jj) {
       const Index v_head = current_outedges[jj];
       const Index row = graph_->n_min_ + graph_->cumulative_outdegrees_[v_min] - 0 + jj;
@@ -362,7 +379,7 @@ template<typename Config> void Graph<Config>::MinProblem::update(
   }
   for (Index ii = 0; ii < graph_->n_min_; ++ii) {
     const Index v_min = ii;  // The indexes of min vertices start at 0.
-	const std::vector<Index>& current_outedges = graph_->outedges_[v_min];
+    const std::vector<Index>& current_outedges = graph_->outedges_[v_min];
     graph_->position_(v_min) = 0;
     for (Index jj = 0; jj < graph_->outdegrees_[v_min]; ++jj) {
       const Index row = graph_->n_max_ + graph_->cumulative_outdegrees_[v_min] - 0 + jj;
@@ -394,11 +411,11 @@ typename Graph<Config>::Vector Graph<Config>::MaxProblem::init_position() const 
   }
   for (Index ii = 0; ii < graph_->n_max_; ++ii) {
     const Index v_max = ii + graph_->n_min_;  // The indexes of max vertices start at n_min_.
-	const std::vector<Index>& current_outedges = graph_->outedges_[v_max];
+    const std::vector<Index>& current_outedges = graph_->outedges_[v_max];
     for (Index jj = 0; jj < graph_->outdegrees_[v_max]; ++jj) {
       const Index v_head = current_outedges[jj];
       const Index row = graph_->n_max_ + graph_->cumulative_outdegrees_[v_max]
-		  - graph_->cumulative_outdegrees_[graph_->n_min_] + jj;
+                      - graph_->cumulative_outdegrees_[graph_->n_min_] + jj;
       max_position(row) = graph_->position_(v_max) * graph_->flow_.coeff(v_head, v_max);
     }
   }
@@ -536,7 +553,7 @@ template<typename Config> void Graph<Config>::MaxProblem::update(
   }
   for (Index ii = 0; ii < graph_->n_max_; ++ii) {
     const Index v_max = ii + graph_->n_min_;
-	const std::vector<Index>& current_outedges = graph_->outedges_[v_max];
+    const std::vector<Index>& current_outedges = graph_->outedges_[v_max];
     graph_->position_(v_max) = 0;
     for (Index jj = 0; jj < graph_->outdegrees_[v_max]; ++jj) {
       const Index row = graph_->n_min_ + graph_->cumulative_outdegrees_[v_max] - graph_->m_min_ + jj;

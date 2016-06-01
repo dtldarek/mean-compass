@@ -102,16 +102,16 @@ class Graph {
   void init_state(const Real& barrier_coef, const Real& mixing_coef);
 
   Index n()       const { return n_; }
-  Index n_min()   const { return n_min; }
-  Index n_max()   const { return n_max; }
+  Index n_min()   const { return n_min_; }
+  Index n_max()   const { return n_max_; }
   Index m()       const { return m_; }
-  Index m_min()   const { return m_min; }
-  Index m_max()   const { return m_max; }
+  Index m_min()   const { return m_min_; }
+  Index m_max()   const { return m_max_; }
   Real  epsilon() const { return epsilon_; }
   Index index(const std::string& label) const { return index_.at(label); }
 
-  const std::string& label(Index index) const { return *label_[index]; }
-  const Weight& weigh(Index index) const { return weight_[index]; }
+  const std::string& label(Index index) const { return label_[index]; }
+  const Weight& weight(Index index) const { return weight_[index]; }
   const std::vector<Index>& inedges(Index index) const { return inedges_[index]; }
   const std::vector<Index>& outedges(Index index) const { return outedges_[index]; }
 

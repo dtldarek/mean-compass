@@ -40,6 +40,7 @@ using SparseLU       = Eigen::SparseLU<SparseMatrix, Eigen::COLAMDOrdering<Index
 
 template<
     bool option_use_colors = true,
+	bool option_parity = false,
     typename Index_     = default_types::Index,
     typename Integer_   = default_types::Integer,
     typename Rational_  = default_types::Rational,
@@ -64,6 +65,7 @@ class Config {
   using LU         = LU_;
   using Weight     = Weight_;
   static constexpr bool use_colors = option_use_colors;
+  static constexpr bool parity = option_parity;
 };
 
 }  // namespace mean_compass
