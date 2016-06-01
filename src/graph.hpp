@@ -229,7 +229,7 @@ typename Graph<Config>::Vector Graph<Config>::MinProblem::init_position() const 
     const std::vector<Index>& current_outedges = graph_->outedges_[v_min];
     for (Index jj = 0; jj < graph_->outdegrees_[v_min]; ++jj) {
       const Index v_head = current_outedges[jj];
-      const Index row = graph_->n_min_ + graph_->cumulative_outdegrees_[v_min] - 0 + jj;
+      const Index row = graph_->n_max_ + graph_->cumulative_outdegrees_[v_min] - 0 + jj;
       min_position(row) = graph_->position_(v_min) * graph_->flow_.coeff(v_head, v_min);
     }
   }
@@ -414,7 +414,7 @@ typename Graph<Config>::Vector Graph<Config>::MaxProblem::init_position() const 
     const std::vector<Index>& current_outedges = graph_->outedges_[v_max];
     for (Index jj = 0; jj < graph_->outdegrees_[v_max]; ++jj) {
       const Index v_head = current_outedges[jj];
-      const Index row = graph_->n_max_ + graph_->cumulative_outdegrees_[v_max]
+      const Index row = graph_->n_min_ + graph_->cumulative_outdegrees_[v_max]
                       - graph_->cumulative_outdegrees_[graph_->n_min_] + jj;
       max_position(row) = graph_->position_(v_max) * graph_->flow_.coeff(v_head, v_max);
     }
