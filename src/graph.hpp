@@ -321,7 +321,7 @@ typename Graph<Config>::Matrix Graph<Config>::MinProblem::equality_matrix(
       const Index col = ii;
       // The inner loop iterates over some rows.
       for (typename Matrix::InnerIterator it(graph_->flow_, v_max); it; ++it) {
-        if (it.row() != graph_->n_) {
+        if (it.row() != graph_->n_ - 1) {
           // Out-flow from v_max to v_row.
           triplets.push_back(Triplet(it.row(), col, it.value() * non_mixing_coef_));
         }
@@ -499,7 +499,7 @@ typename Graph<Config>::Matrix Graph<Config>::MaxProblem::equality_matrix(
       const Index col = ii;
       // The inner loop iterates over some rows.
       for (typename Matrix::InnerIterator it(graph_->flow_, v_min); it; ++it) {
-        if (it.row() != graph_->n_) {
+        if (it.row() != graph_->n_ - 1) {
           // Out-flow from v_min to v_row.
           triplets.push_back(Triplet(it.row(), col, it.value() * non_mixing_coef_));
         }
@@ -524,8 +524,10 @@ typename Graph<Config>::Matrix Graph<Config>::MaxProblem::equality_matrix(
           // Out-flow from v_max via e_max to v_row.
           triplets.push_back(Triplet(v_row, col_max, non_mixing_coef_));
         }
-        // In-flow of v_max, i.e., the sum of all related e_max.
-        triplets.push_back(Triplet(v_max, col_max, -1.0));
+        if (v_max != graph_->n_ - 1) {
+          // In-flow of v_max, i.e., the sum of all related e_max.
+          triplets.push_back(Triplet(v_max, col_max, -1.0));
+        }
         // The last row value.
         triplets.push_back(Triplet(graph_->n_ - 1, col_max, 1.0));
         col_max++;
