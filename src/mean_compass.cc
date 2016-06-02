@@ -32,18 +32,22 @@ template<typename Config> inline void handle_graph(
   using Real    = typename Config::Real;
   using Vector  = typename Config::Vector;
 
-  Graph<Config> graph(graph_);
-  graph.init_state(0.001, 0.01);
+  Real mixing_coef = 0.1;
+  Real barrier_coef = 1.0;
 
+  Graph<Config> graph(graph_);
+  graph.init_state(barrier_coef, mixing_coef);
+
+  // Solve the graph. {{{
   Vector old_position = Vector::Constant(graph.n(), 0);
   Vector min_dual = Vector::Constant(graph.n(), 1);
   Vector max_dual = Vector::Constant(graph.n(), 1);
-  for (Real barrier_coef = Real(1.0); barrier_coef >= graph.epsilon(); barrier_coef /= 2) {
+  for (; barrier_coef >= graph.epsilon(); barrier_coef /= 2, mixing_coef /= 2) {
     std::cout << "barrier: " << barrier_coef << ' ';
     do {
       std::cout << '.';
       old_position = graph.position();
-      typename Graph<Config>::MinProblem min_problem = graph.get_min_problem(barrier_coef, 0.01);
+      typename Graph<Config>::MinProblem min_problem = graph.get_min_problem(barrier_coef, mixing_coef);
       SimpleNewton<Config, typename Graph<Config>::MinProblem> min_newton(&min_problem);
       min_newton.step(&min_dual);
       min_newton.step(&min_dual);
@@ -52,7 +56,7 @@ template<typename Config> inline void handle_graph(
       min_problem.update(min_newton.position());
       //std::cout << "min: " << std::fixed << graph.position().transpose() << '\n' << std::scientific;
 
-      typename Graph<Config>::MaxProblem max_problem = graph.get_max_problem(barrier_coef, 0.01);
+      typename Graph<Config>::MaxProblem max_problem = graph.get_max_problem(barrier_coef, mixing_coef);
       SimpleNewton<Config, typename Graph<Config>::MaxProblem> max_newton(&max_problem);
       max_newton.step(&max_dual);
       max_newton.step(&max_dual);
@@ -63,6 +67,7 @@ template<typename Config> inline void handle_graph(
     } while ((graph.position() - old_position).norm() > graph.epsilon());
     std::cout << '\n';
   }
+  // }}} The graph-solving has finished.
 
   // Discretize strategy and calculate the sign of infinite games. {{{
   std::vector<Index> v_positive;
@@ -234,7 +239,10 @@ int main(int argc, char** argv) {
       ("version", "Print version of the program.")
       ("config-file",
            po::value<std::string>(&config.config_file_name()),
-           "Parse options from configuration file given.");
+           "Parse options from configuration file given.")
+      ("input-file",
+           po::value<std::vector<std::string>>(&config.input_files())->composing(),
+           "The input files to process, can be used multiple times.");
     po::options_description config_options("Configuration");
     config_options.add_options()
       // We use int, because program_options parses "-5" with unsigned types.
@@ -248,10 +256,7 @@ int main(int argc, char** argv) {
       ("display-precision,d",
            po::value<int>(&config.display_precision())->notifier(
              utils::check_range<int, 2, std::numeric_limits<int>::max()>),
-           "Set the precision of the output.")
-      ("input-file",
-           po::value<std::vector<std::string>>(&config.input_files())->composing(),
-           "The input files to process, can be used multiple times.");
+           "Set the precision of the output.");
     po::options_description all_options;
     all_options.add(generic_options).add(config_options);
     po::positional_options_description positional_description;
