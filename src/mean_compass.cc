@@ -32,7 +32,7 @@ template<typename Config> inline void handle_graph(mean_compass::Graph<Config>&&
   Graph<Config> graph(graph_);
 
   std::cout << graph.n() << '\n';
-  graph.init_state(0.001, 0.001);
+  graph.init_state(0.001, 0.01);
   for (Index ii = 0; ii < graph.n(); ++ii) {
     std::cout << ' ' << graph.position()(ii);
   }
@@ -41,7 +41,7 @@ template<typename Config> inline void handle_graph(mean_compass::Graph<Config>&&
   Vector old_position = Vector::Constant(graph.n(), 0);
   Vector min_dual = Vector::Constant(graph.n(), 1);
   Vector max_dual = Vector::Constant(graph.n(), 1);
-  for (Real barrier_coef = Real(10000.0) / graph.epsilon(); barrier_coef >= graph.epsilon(); barrier_coef /= 2) {
+  for (Real barrier_coef = Real(1.0) / graph.epsilon(); barrier_coef >= graph.epsilon(); barrier_coef /= 2) {
     std::cout << "barrier: " << barrier_coef << ' ';
     do {
       std::cout << '.';
@@ -184,30 +184,7 @@ template<typename Config> inline int main_with_config(
             << utils::AnsiColors<Config>::ENDC << '\n'
             << std::flush;
 
-  // Do some tests. {{{
-  const size_t size = 100;
-
   Real::default_precision(option_default_precision);
-
-  std::vector<Triplet> triplets;
-  triplets.reserve(10*size);
-  for (size_t ii = 0; ii < 10*size; ++ii) {
-    triplets.push_back(Triplet(
-          utils::unirand<Index>(size),
-          utils::unirand<Index>(size),
-          utils::unirand()));
-  }
-  Matrix A(size, size);
-  A.setFromTriplets(triplets.begin(), triplets.end());
-  A.makeCompressed();
-  Vector b = Vector::Random(size);
-
-  typename Config::LU solver;
-  solver.analyzePattern(A);
-  solver.factorize(A);
-  Vector x = solver.solve(b);
-  std::cout << "relative error: " << (A*x - b).norm() / b.norm() << std::endl;
-  // End doing some tests. }}}
 
   if (input_files.size() == 0) {
       std::cout << utils::AnsiColors<Config>::GREEN
