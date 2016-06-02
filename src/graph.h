@@ -94,8 +94,8 @@ class Graph {
    *
    * (note: temporary objects are destroyed at the end of the full expression).
    */
-  explicit Graph(UTF8Input&& input) : Graph(&input) { }
-  explicit Graph(UTF8Input* input);
+  explicit Graph(const Config& config, UTF8Input&& input) : Graph(config, &input) { }
+  explicit Graph(const Config& config, UTF8Input* input);
 
   // Initialize the flow matrix, position and targets.
   void init_state(UTF8Input* input);

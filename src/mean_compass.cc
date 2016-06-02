@@ -23,14 +23,16 @@
 
 namespace {
 
-template<typename Config> inline void handle_graph(mean_compass::Graph<Config>&& graph_) {
+template<typename Config> inline void handle_graph(
+    const Config& config,
+    mean_compass::Graph<Config>&& graph_) {
+  static_cast<void>(config);
   using namespace mean_compass;
   using Index   = typename Config::Index;
   using Real    = typename Config::Real;
   using Vector  = typename Config::Vector;
 
   Graph<Config> graph(graph_);
-
   graph.init_state(0.001, 0.01);
 
   Vector old_position = Vector::Constant(graph.n(), 0);
@@ -62,8 +64,7 @@ template<typename Config> inline void handle_graph(mean_compass::Graph<Config>&&
     std::cout << '\n';
   }
 
-  // Discretize strategy and calculate the sign of infinite games.
-
+  // Discretize strategy and calculate the sign of infinite games. {{{
   std::vector<Index> v_positive;
   std::vector<Index> v_negative;
   std::vector<Index> strategy(graph.n(), graph.n()+1);
@@ -108,7 +109,9 @@ template<typename Config> inline void handle_graph(mean_compass::Graph<Config>&&
       }
     }
     path.clear();
-  }
+  }  // }}} End of discretizing the strategy.
+
+  // Print the results. {{{
   std::sort(v_positive.begin(), v_positive.end());
   std::sort(v_negative.begin(), v_negative.end());
   if (v_negative.size() > 0) {
@@ -160,13 +163,10 @@ template<typename Config> inline void handle_graph(mean_compass::Graph<Config>&&
   std::cout << "]\n";
 
   std::cout << '\n' << std::flush;
+  // }}} End of printing results.
 }
 
-// We pass all the parameters and options directly.
-// Should there be too many of them, we can put them into Config class.
-template<typename Config> inline int main_with_config(
-    const std::vector<std::string>& input_files,
-    const int option_default_precision) {
+template<typename Config> inline int main_with_config(const Config& config) {
   using namespace mean_compass;
   using Real    = typename Config::Real;
 
@@ -175,19 +175,19 @@ template<typename Config> inline int main_with_config(
             << utils::AnsiColors<Config>::ENDC << '\n'
             << std::flush;
 
-  Real::default_precision(option_default_precision);
+  Real::default_precision(config.default_precision());
 
-  if (input_files.size() == 0) {
+  if (config.input_files().size() == 0) {
       std::cout << utils::AnsiColors<Config>::GREEN
         << "Processing stdin"
         << utils::AnsiColors<Config>::ENDC << '\n' << std::flush;
-      handle_graph(Graph<Config>(UTF8Input()));
+      handle_graph(config, Graph<Config>(config, UTF8Input()));
   } else {
-    for (const std::string& input_file : input_files) {
+    for (const std::string& input_file : config.input_files()) {
       std::cout << utils::AnsiColors<Config>::GREEN
         << "Processing " << input_file
         << utils::AnsiColors<Config>::ENDC << '\n' << std::flush;
-      handle_graph(Graph<Config>(UTF8Input(input_file)));
+      handle_graph(config, Graph<Config>(config, UTF8Input(input_file)));
     }
   }
 
@@ -208,14 +208,17 @@ int main(int argc, char** argv) {
   using namespace mean_compass;
 
   // Parse cmdline flags. {{{
+
+  // Static options:
   bool option_verbose = false;
   bool option_use_colors = false;
-  bool option_parity = false;
-  std::string option_config_file_name;
-  std::vector<std::string> input_files;
-  int option_default_precision = 256;
-  int option_display_precision = 4;
-  std::cout << std::setprecision(option_display_precision);
+
+  // Dynamic options:
+  DynamicConfig config;
+  config.parity(false)
+        .default_precision(256)
+        .display_precision(4);
+  std::cout << std::setprecision(config.display_precision());
 
   try {
     namespace po = boost::program_options;
@@ -230,24 +233,24 @@ int main(int argc, char** argv) {
             "Use ANSI terminal colors.")
       ("version", "Print version of the program.")
       ("config-file",
-           po::value<std::string>(&option_config_file_name),
+           po::value<std::string>(&config.config_file_name()),
            "Parse options from configuration file given.");
     po::options_description config_options("Configuration");
     config_options.add_options()
       // We use int, because program_options parses "-5" with unsigned types.
       ("parity-game,g",
-           po::bool_switch(&option_parity),
+           po::bool_switch(&config.parity()),
            "The input graph specifies a parity game, even=max")
       ("default-precision,p",
-           po::value<int>(&option_default_precision)->notifier(
+           po::value<int>(&config.default_precision())->notifier(
              utils::check_range<int, 2, std::numeric_limits<int>::max()>),
            "Set the default precision of MPFR.")
       ("display-precision,d",
-           po::value<int>(&option_display_precision)->notifier(
+           po::value<int>(&config.display_precision())->notifier(
              utils::check_range<int, 2, std::numeric_limits<int>::max()>),
            "Set the precision of the output.")
       ("input-file",
-           po::value<std::vector<std::string>>(&input_files)->composing(),
+           po::value<std::vector<std::string>>(&config.input_files())->composing(),
            "The input files to process, can be used multiple times.");
     po::options_description all_options;
     all_options.add(generic_options).add(config_options);
@@ -261,7 +264,7 @@ int main(int argc, char** argv) {
         variables_map);
     po::notify(variables_map);
     if (variables_map.count("config-file")) {
-      std::ifstream config_file(option_config_file_name);
+      std::ifstream config_file(config.config_file_name());
       po::store(po::parse_config_file(config_file, all_options),
           variables_map);
       variables_map.notify();
@@ -276,10 +279,10 @@ int main(int argc, char** argv) {
       return 0;
     }
     if (variables_map.count("default-precision")) {
-      std::cout << std::setprecision(option_default_precision);
+      std::cout << std::setprecision(config.default_precision());
     }
     if (variables_map.count("display-precision")) {
-      std::cout << std::setprecision(option_display_precision);
+      std::cout << std::setprecision(config.display_precision());
     }
   } catch (std::exception& e) {
     std::cout << e.what() << '\n' << std::flush;
@@ -287,18 +290,18 @@ int main(int argc, char** argv) {
   }
   // End of parsing cmdline flags }}}
 
-  if (!option_use_colors && !option_parity) {
-    return main_with_config<Config<false, false>>(input_files, option_default_precision);
-  } else if (!option_use_colors && option_parity) {
-    return main_with_config<Config<false, true>>(input_files, option_default_precision);
-  } else if (option_use_colors && !option_parity) {
-    return main_with_config<Config<true, false>>(input_files, option_default_precision);
-  } else if (option_use_colors && option_parity) {
-    return main_with_config<Config<true, true>>(input_files, option_default_precision);
+  if (!option_verbose && !option_use_colors) {
+    return main_with_config(static_cast<Config<false, false>>(config));
+  } else if (!option_verbose && option_use_colors) {
+    return main_with_config(static_cast<Config<false, true>>(config));
+  } else if (option_verbose && !option_use_colors) {
+    return main_with_config(static_cast<Config<true, false>>(config));
+  } else if (option_verbose && option_use_colors) {
+    return main_with_config(static_cast<Config<true, true>>(config));
   } else {
     assert(false);
   }
 
 }
 
-// vim: foldmethod=marker
+// vim: et sw=2 ts=2 foldmethod=marker

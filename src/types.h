@@ -9,6 +9,7 @@
 #ifndef __MEAN_COMPASS_TYPES_H__
 #define __MEAN_COMPASS_TYPES_H__
 
+#include <algorithm>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/multiprecision/mpfr.hpp>
 #include <Eigen/OrderingMethods>
@@ -38,9 +39,42 @@ using SparseLU       = Eigen::SparseLU<SparseMatrix, Eigen::COLAMDOrdering<Index
 
 }  // namespace default_types
 
+// The dynamic part of the config.
+struct DynamicConfig {
+ public:
+  DynamicConfig() = default;
+ protected:
+  DynamicConfig(const DynamicConfig&) = default;
+  DynamicConfig& operator=(const DynamicConfig&) = default;
+ public:
+  // We do not delete move constructor and operator because it
+  // won't copy the expensive data structures like string or vector.
+
+# define __MEAN_COMPASS__OPTION(type, name) \
+ private: \
+  type name ## _; \
+ public: \
+  DynamicConfig& name(type param) {  /* Temporary. */ \
+    using std::swap; \
+    swap(name ## _, param); \
+    return *this; \
+  } \
+  const type& name() const { return name ## _; } \
+  type& name() { return name ## _; } \
+  /* End of __MEAN_COMPASS__OPTION macro. */
+
+  __MEAN_COMPASS__OPTION(std::string, config_file_name)
+  __MEAN_COMPASS__OPTION(bool,        parity)
+  __MEAN_COMPASS__OPTION(int,         default_precision)
+  __MEAN_COMPASS__OPTION(int,         display_precision)
+  __MEAN_COMPASS__OPTION(std::vector<std::string>, input_files)
+
+# undef __MEAN_COMPASS__OPTION
+};
+
 template<
+    bool option_verbose = false,
     bool option_use_colors = true,
-	bool option_parity = false,
     typename Index_     = default_types::Index,
     typename Integer_   = default_types::Integer,
     typename Rational_  = default_types::Rational,
@@ -52,8 +86,7 @@ template<
     // Beware, the default assumes that Matrix_ works with SparseLU.
     typename LU_        = Eigen::SparseLU<Matrix_, Eigen::COLAMDOrdering<Index_>>,
     typename Weight_    = Real_>
-class Config {
- public:
+struct Config : public DynamicConfig {
   using Index      = Index_;
   using Integer    = Integer_;
   using Rational   = Rational_;
@@ -64,8 +97,31 @@ class Config {
   using Vector     = Vector_;
   using LU         = LU_;
   using Weight     = Weight_;
-  static constexpr bool use_colors = option_use_colors;
-  static constexpr bool parity = option_parity;
+
+  constexpr static const bool verbose = option_verbose;
+  constexpr static const bool use_colors = option_use_colors;
+
+  Config() = default;
+  Config(const Config&) = delete;
+  Config& operator=(const Config&) = delete;
+
+  Config(const DynamicConfig& param) : DynamicConfig(param) { }
+  Config(DynamicConfig&& param) :
+      DynamicConfig(std::forward<DynamicConfig>(param)) {
+    // Nothing here.
+  }
+  // We do not delete move constructor and operator because it
+  // won't copy the expensive data structures like string or vector.
+
+  // Forward everything else to DynamicConfig,
+  // we explictly state the first argument, so that it does not interfere
+  // with the copy constructor.
+  template<typename ...Args>
+  Config(std::string&& config_file_name, Args&&... args) :
+    DynamicConfig(std::forward<std::string>(config_file_name),
+                  std::forward<Args>(args)...) {
+    // Nothing here.
+  }
 };
 
 }  // namespace mean_compass

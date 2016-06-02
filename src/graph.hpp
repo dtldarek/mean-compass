@@ -12,7 +12,7 @@
 
 namespace mean_compass {
 
-template<typename Config> Graph<Config>::Graph(UTF8Input* input) {
+template<typename Config> Graph<Config>::Graph(const Config& config, UTF8Input* input) {
   // Parse the number of vertices and edges.
   input->get(&n_min_);
   input->get(&n_max_);
@@ -46,7 +46,7 @@ template<typename Config> Graph<Config>::Graph(UTF8Input* input) {
   for (Index ii = 0; ii < n_; ++ii) {
     input->get(&label_[ii]);
     index_[label_[ii]] = ii;
-    if (Config::parity) {  // The weight is actually a parity game priority.
+    if (config.parity()) {  // The weight is actually a parity game priority.
       int priority;
       input->get(&priority);
       // TODO: Depends on the type of Weight.
