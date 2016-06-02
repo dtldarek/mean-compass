@@ -221,4 +221,4 @@ constexpr const char UTF8Input::base64tab[256];
 
 }  // namespace mean_compass
 
-// vim: foldmethod=marker
+// vim: et sw=2 ts=2 foldmethod=marker

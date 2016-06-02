@@ -80,3 +80,5 @@ void check_range(const T& value) {
 }  // namespace mean_compass
 
 #endif  // __MEAN_COMPASS_UTILS_H__
+
+// vim: et sw=2 ts=2

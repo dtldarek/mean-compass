@@ -71,3 +71,5 @@ class Config {
 }  // namespace mean_compass
 
 #endif  // __MEAN_COMPASS_TYPES_H__
+
+// vim: et sw=2 ts=2

@@ -31,17 +31,12 @@ template<typename Config> inline void handle_graph(mean_compass::Graph<Config>&&
 
   Graph<Config> graph(graph_);
 
-  std::cout << graph.n() << '\n';
   graph.init_state(0.001, 0.01);
-  for (Index ii = 0; ii < graph.n(); ++ii) {
-    std::cout << ' ' << graph.position()(ii);
-  }
-  std::cout << '\n';
 
   Vector old_position = Vector::Constant(graph.n(), 0);
   Vector min_dual = Vector::Constant(graph.n(), 1);
   Vector max_dual = Vector::Constant(graph.n(), 1);
-  for (Real barrier_coef = Real(1.0) / graph.epsilon(); barrier_coef >= graph.epsilon(); barrier_coef /= 2) {
+  for (Real barrier_coef = Real(1.0); barrier_coef >= graph.epsilon(); barrier_coef /= 2) {
     std::cout << "barrier: " << barrier_coef << ' ';
     do {
       std::cout << '.';
@@ -173,11 +168,7 @@ template<typename Config> inline int main_with_config(
     const std::vector<std::string>& input_files,
     const int option_default_precision) {
   using namespace mean_compass;
-  using Index   = typename Config::Index;
   using Real    = typename Config::Real;
-  using Matrix  = typename Config::Matrix;
-  using Vector  = typename Config::Vector;
-  using Triplet = typename Config::Triplet;
 
   std::cout << utils::AnsiColors<Config>::GREEN
             << "Starting..."

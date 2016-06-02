@@ -71,4 +71,4 @@ UTF8Input& UTF8Input::get_nostrip_signed(T* result, char32_t c) {
 
 }  // namespace mean_compass
 
-// vim: foldmethod=marker
+// vim: et sw=2 ts=2 foldmethod=marker

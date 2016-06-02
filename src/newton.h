@@ -90,6 +90,7 @@ class SimpleNewton {
     Vector step = hessian_inv * (equality_matrix_.transpose() * new_dual + gradient) * (-1);
     Vector dual_step = new_dual - *dual;
     Real alt = 0.01;
+    assert(!boost::math::isnan(step.norm()));
     while (true) {
       Vector new_position = position_ + step;
       new_dual = *dual + dual_step;

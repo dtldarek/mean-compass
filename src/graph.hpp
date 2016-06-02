@@ -88,6 +88,7 @@ template<typename Config> Graph<Config>::Graph(UTF8Input* input) {
   // Postprocessing for the min player (edge sorting, outdegrees).
   m_min_ = 0;
   for (Index ii = 0; ii < n_min_; ++ii) {
+    assert(outedges_[ii].size() > 0);
     std::sort(inedges_[ii].begin(), inedges_[ii].end());
     std::sort(outedges_[ii].begin(), outedges_[ii].end());
     m_min_ += outedges_[ii].size();
@@ -98,6 +99,7 @@ template<typename Config> Graph<Config>::Graph(UTF8Input* input) {
   // Postprocessing for the max player (edge sorting, outdegrees).
   m_max_ = 0;
   for (Index ii = n_min_; ii < n_; ++ii) {
+    assert(outedges_[ii].size() > 0);
     std::sort(inedges_[ii].begin(), inedges_[ii].end());
     std::sort(outedges_[ii].begin(), outedges_[ii].end());
     m_max_ += outedges_[ii].size();
@@ -177,8 +179,7 @@ template<typename Config> void Graph<Config>::init_position(
   vec(n_ - 1) = non_mixing_coef;
 
   typename Config::LU solver;
-  solver.analyzePattern(mat);
-  solver.factorize(mat);
+  solver.compute(mat);
   position_ = solver.solve(vec);
 }
 template<typename Config> void Graph<Config>::init_targets() {
@@ -572,4 +573,4 @@ template<typename Config> void Graph<Config>::MaxProblem::update(
 
 }  // namespace mean_compass
 
-// vim: foldmethod=syntax
+// vim: et sw=2 ts=2 foldmethod=syntax

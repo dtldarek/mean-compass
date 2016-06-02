@@ -184,3 +184,5 @@ class Graph {
 #include "graph.hpp"
 
 #endif  // __MEAN_COMPASS_GRAPH_H__
+
+// vim: et sw=2 ts=2

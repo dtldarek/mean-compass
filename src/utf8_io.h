@@ -164,3 +164,5 @@ class UTF8Input {
 #include "utf8_io.hpp"
 
 #endif  // __MEAN_COMPASS_UTF8_IO_H__
+
+// vim: et sw=2 ts=2
