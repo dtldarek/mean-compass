@@ -34,6 +34,10 @@ template<typename Config> inline void handle_graph(
 
   Real mixing_coef = 0.1;
   Real barrier_coef = 1.0;
+  Real barrier_multiplier = 0.5;
+  if (!config.barrier_multiplier_str().empty()) {
+    barrier_multiplier = static_cast<Real>(config.barrier_multiplier_str());
+  }
 
   Graph<Config> graph(graph_);
   graph.init_state(barrier_coef, mixing_coef);
@@ -42,28 +46,40 @@ template<typename Config> inline void handle_graph(
   Vector old_position = Vector::Constant(graph.n(), 0);
   Vector min_dual = Vector::Constant(graph.n(), 1);
   Vector max_dual = Vector::Constant(graph.n(), 1);
-  for (; barrier_coef >= graph.epsilon(); barrier_coef /= 2, mixing_coef /= 2) {
+  for (; barrier_coef >= graph.epsilon();
+         barrier_coef *= barrier_multiplier,
+         mixing_coef *= barrier_multiplier) {
     std::cout << "barrier: " << barrier_coef << ' ';
     do {
-      std::cout << '.';
+      std::cout << (Config::verbose ? '\n' : '.');
       old_position = graph.position();
-      typename Graph<Config>::MinProblem min_problem = graph.get_min_problem(barrier_coef, mixing_coef);
-      SimpleNewton<Config, typename Graph<Config>::MinProblem> min_newton(&min_problem);
+      typename Graph<Config>::MinProblem min_problem =
+          graph.get_min_problem(barrier_coef, mixing_coef);
+      SimpleNewton<Config, typename Graph<Config>::MinProblem>
+          min_newton(&min_problem);
       min_newton.step(&min_dual);
       min_newton.step(&min_dual);
       min_newton.step(&min_dual);
-      //while (min_newton.step(&min_dual) > min_problem.epsilon()) { std::cout << '.'; }
       min_problem.update(min_newton.position());
-      //std::cout << "min: " << std::fixed << graph.position().transpose() << '\n' << std::scientific;
+      if (Config::verbose) {
+        std::cout << "min: "
+                  << std::fixed << graph.position().transpose()
+                  << std::scientific << '\n';
+      }
 
-      typename Graph<Config>::MaxProblem max_problem = graph.get_max_problem(barrier_coef, mixing_coef);
-      SimpleNewton<Config, typename Graph<Config>::MaxProblem> max_newton(&max_problem);
+      typename Graph<Config>::MaxProblem max_problem =
+          graph.get_max_problem(barrier_coef, mixing_coef);
+      SimpleNewton<Config, typename Graph<Config>::MaxProblem>
+          max_newton(&max_problem);
       max_newton.step(&max_dual);
       max_newton.step(&max_dual);
       max_newton.step(&max_dual);
-      //while (max_newton.step(&max_dual) > max_problem.epsilon()) { std::cout << '.'; }
       max_problem.update(max_newton.position());
-      //std::cout << "max: " << std::fixed << graph.position().transpose() << '\n' << std::scientific;
+      if (Config::verbose) {
+        std::cout << "max: "
+                  << std::fixed << graph.position().transpose()
+                  << std::scientific << '\n';
+      }
     } while ((graph.position() - old_position).norm() > graph.epsilon());
     std::cout << '\n';
   }
@@ -256,7 +272,10 @@ int main(int argc, char** argv) {
       ("display-precision,d",
            po::value<int>(&config.display_precision())->notifier(
              utils::check_range<int, 2, std::numeric_limits<int>::max()>),
-           "Set the precision of the output.");
+           "Set the precision of the output.")
+      ("barrier-multiplier,b",
+           po::value<std::string>(&config.barrier_multiplier_str()),
+           "Set the value the barrier coefficient is multiplied by each turn.");
     po::options_description all_options;
     all_options.add(generic_options).add(config_options);
     po::positional_options_description positional_description;
