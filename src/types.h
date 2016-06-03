@@ -69,6 +69,7 @@ struct DynamicConfig {
   __MEAN_COMPASS__OPTION(int,         default_precision)
   __MEAN_COMPASS__OPTION(int,         display_precision)
   __MEAN_COMPASS__OPTION(std::string, barrier_multiplier_str)
+  __MEAN_COMPASS__OPTION(bool,        barrier_adjustment)
 
 # undef __MEAN_COMPASS__OPTION
 };

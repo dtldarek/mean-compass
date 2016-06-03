@@ -49,9 +49,9 @@ template<typename Config> inline void handle_graph(
   for (; barrier_coef >= graph.epsilon();
          barrier_coef *= barrier_multiplier,
          mixing_coef *= barrier_multiplier) {
-    std::cout << "barrier: " << barrier_coef << ' ';
+    std::cout << "barrier: " << barrier_coef << (Config::verbose ? '\n' : ' ');
+    int small_steps = 0;
     do {
-      std::cout << (Config::verbose ? '\n' : '.');
       old_position = graph.position();
       typename Graph<Config>::MinProblem min_problem =
           graph.get_min_problem(barrier_coef, mixing_coef);
@@ -79,8 +79,29 @@ template<typename Config> inline void handle_graph(
         std::cout << "max: "
                   << std::fixed << graph.position().transpose()
                   << std::scientific << '\n';
+      } else {
+        std::cout << '.';
+      }
+      small_steps++;
+      if (config.barrier_adjustment()) {
+        if (small_steps > 10) {
+          barrier_coef /= barrier_multiplier;
+          mixing_coef /= barrier_multiplier;
+          Real barrier_step = Real(1) / (Real(1) - barrier_multiplier) + Real(1);
+          barrier_multiplier = Real(1) - Real(1) / barrier_step;
+          std::cout << " new step: " << barrier_step << ' ';
+          break;
+        }
       }
     } while ((graph.position() - old_position).norm() > graph.epsilon());
+    if (config.barrier_adjustment() && small_steps <= 2 && barrier_multiplier > 0.5) {
+      Real barrier_step = Real(1) / (Real(1) - barrier_multiplier) - Real(1);
+      if (barrier_step < 2) {
+        barrier_step = 2;
+      }
+      barrier_multiplier = Real(1) - Real(1) / barrier_step;
+      std::cout << " new step: " << barrier_step << ' ';
+    }
     std::cout << '\n';
   }
   // }}} The graph-solving has finished.
@@ -275,7 +296,10 @@ int main(int argc, char** argv) {
            "Set the precision of the output.")
       ("barrier-multiplier,b",
            po::value<std::string>(&config.barrier_multiplier_str()),
-           "Set the value the barrier coefficient is multiplied by each turn.");
+           "Set the value the barrier coefficient is multiplied by each turn.")
+      ("barrier-adjustment,a",
+           po::bool_switch(&config.barrier_adjustment()),
+           "Make the barrier step variable.");
     po::options_description all_options;
     all_options.add(generic_options).add(config_options);
     po::positional_options_description positional_description;
