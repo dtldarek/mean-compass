@@ -24,6 +24,7 @@
 
 namespace {
 
+// SIGINT handler {{{
 sig_atomic_t sigint_caught = 0;
 void (*prev_sigint_handler)(int) = SIG_IGN;
 
@@ -39,7 +40,9 @@ class SIGINTException : public std::exception {
  public:
   SIGINTException() : std::exception() { }
 };
+// }}} End of SIGINT handler.
 
+// void check_for_sigint(config, graph, barrier_coef, mixing_coef) {{{
 template<typename Config> inline void check_for_sigint(
     const Config& config,
     const mean_compass::Graph<Config>& graph,
@@ -74,7 +77,7 @@ template<typename Config> inline void check_for_sigint(
     }
     throw SIGINTException();
   }
-}
+}  // }}} End of check_for_sigint.
 
 
 template<typename Config> inline void handle_graph(
@@ -86,6 +89,7 @@ template<typename Config> inline void handle_graph(
   using Real    = typename Config::Real;
   using Vector  = typename Config::Vector;
 
+  // Setup {{{
   Real mixing_coef = 0.1;
   Real barrier_coef = 1.0;
   Real barrier_multiplier = 0.5;
@@ -102,9 +106,11 @@ template<typename Config> inline void handle_graph(
     mixing_coef = state_data.get_real();
     if (state_data) graph.init_state(&state_data);
   }
+  // }}} End of setup.
 
   // Solve the graph. {{{
   Vector old_position = Vector::Constant(graph.n(), 0);
+  Vector mid_position = Vector::Constant(graph.n(), 0);
   Vector min_dual = Vector::Constant(graph.n(), 1);
   Vector max_dual = Vector::Constant(graph.n(), 1);
   for (; barrier_coef >= graph.epsilon();
@@ -124,11 +130,21 @@ template<typename Config> inline void handle_graph(
       min_newton.step(&min_dual);
       min_problem.update(min_newton.position());
       if (Config::verbose) {
-        std::cout << "min: "
-                  << std::fixed << graph.position().transpose()
-                  << std::scientific << '\n';
+        //std::cout << "min: "
+        //          << std::fixed << graph.position().transpose()
+        //          << std::scientific << '\n';
+        Vector diff = graph.position() - old_position;
+        std::cout << "min: ";
+        for (Index ii = 0; ii < graph.n(); ++ii) {
+          char c = diff(ii) > graph.epsilon() / graph.n() ? '+' : diff(ii) < -graph.epsilon() / graph.n() ? '-' : ' ';
+          std::cout << c;
+        }
+        std::cout << '\n';
       }
 
+      if (Config::verbose) {
+        mid_position = graph.position();
+      }
       typename Graph<Config>::MaxProblem max_problem =
           graph.get_max_problem(barrier_coef, mixing_coef);
       SimpleNewton<Config, typename Graph<Config>::MaxProblem>
@@ -138,9 +154,16 @@ template<typename Config> inline void handle_graph(
       max_newton.step(&max_dual);
       max_problem.update(max_newton.position());
       if (Config::verbose) {
-        std::cout << "max: "
-                  << std::fixed << graph.position().transpose()
-                  << std::scientific << '\n';
+        //std::cout << "max: "
+        //          << std::fixed << graph.position().transpose()
+        //          << std::scientific << '\n';
+        Vector diff = graph.position() - mid_position;
+        std::cout << "max: ";
+        for (Index ii = 0; ii < graph.n(); ++ii) {
+          char c = diff(ii) > graph.epsilon() / graph.n() ? '+' : diff(ii) < -graph.epsilon() / graph.n() ? '-' : ' ';
+          std::cout << c;
+        }
+        std::cout << '\n';
       } else {
         std::cout << '.';
       }
@@ -270,6 +293,7 @@ template<typename Config> inline void handle_graph(
   // }}} End of printing results.
 }
 
+// Main with config. {{{
 template<typename Config> inline int main_with_config(const Config& config) {
   using namespace mean_compass;
   using Real    = typename Config::Real;
@@ -317,13 +341,13 @@ template<typename Config> inline int main_with_config(const Config& config) {
             << std::flush;
 
   return 0;
-}
+}  // }}} End of main with config.
 
 }  // anonymous namespace
 
 constexpr const char* version_string = "Mean Compass version 0.1.1";
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) {  // {{{
   // FIXME: Only the most basic things in main().
   using namespace mean_compass;
 
@@ -430,6 +454,7 @@ int main(int argc, char** argv) {
   }
   // End of parsing cmdline flags }}}
 
+  // Call main_with_config. {{{
   if (!option_verbose && !option_use_colors) {
     return main_with_config(static_cast<Config<false, false>>(config));
   } else if (!option_verbose && option_use_colors) {
@@ -441,7 +466,8 @@ int main(int argc, char** argv) {
   } else {
     assert(false);
   }
+  // }}} End of main_with_config calls.
 
-}
+}  // }}} End of main.
 
 // vim: et sw=2 ts=2 foldmethod=marker
