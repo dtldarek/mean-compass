@@ -65,6 +65,9 @@ struct DynamicConfig {
 
   __MEAN_COMPASS__OPTION(std::string, config_file_name)
   __MEAN_COMPASS__OPTION(std::vector<std::string>, input_files)
+  __MEAN_COMPASS__OPTION(std::string, dump_file)
+  __MEAN_COMPASS__OPTION(bool,        overwrite_dump_file)
+  __MEAN_COMPASS__OPTION(std::string, restore_file)
   __MEAN_COMPASS__OPTION(bool,        parity)
   __MEAN_COMPASS__OPTION(int,         default_precision)
   __MEAN_COMPASS__OPTION(int,         display_precision)

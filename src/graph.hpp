@@ -114,7 +114,18 @@ template<typename Config> void Graph<Config>::init_state(UTF8Input* input) {
   flow_.reserve(outdegrees_);
   for (Index col = 0; col < n_; ++col) {
     for (Index row : outedges_[col]) {
-      flow_.insert(row, col) = input->get_real();
+      int input_row = input->get_int();
+      int input_col = input->get_int();
+      if (input_row == row && input_col == col) {
+        flow_.insert(row, col) = input->get_real();
+      } else {
+        std::stringstream description;
+        description << "Wrong dump: encountered cell ("
+                    << input_row << ", " << input_col << ") "
+                    << "while expecting ("
+                    << row << ", " << col << ")";
+        throw std::runtime_error(description.str());
+      }
     }
   }
   // Initialize position.

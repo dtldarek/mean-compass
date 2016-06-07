@@ -8,6 +8,7 @@
 
 #include "mean_compass.h"
 #include <cassert>
+#include <csignal>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -22,6 +23,59 @@
 #include "utf8_io.h"
 
 namespace {
+
+sig_atomic_t sigint_caught = 0;
+void (*prev_sigint_handler)(int) = SIG_IGN;
+
+void sigint_handler(int signum) {
+  assert(signum == SIGINT);
+  sigint_caught = 1;
+  if (prev_sigint_handler != SIG_IGN && prev_sigint_handler != SIG_DFL) {
+    (*prev_sigint_handler)(signum);
+  }
+}
+
+class SIGINTException : public std::exception {
+ public:
+  SIGINTException() : std::exception() { }
+};
+
+template<typename Config> inline void check_for_sigint(
+    const Config& config,
+    const mean_compass::Graph<Config>& graph,
+    const typename Config::Real& barrier_coef,
+    const typename Config::Real& mixing_coef) {
+  using Index = typename Config::Index;
+  using Matrix = typename Config::Matrix;
+  if (sigint_caught) {
+    if (!config.dump_file().empty()) {
+      std::ofstream file;
+      if (config.overwrite_dump_file()) {
+        file.open(config.dump_file(),
+                  std::ofstream::out | std::ofstream::trunc);
+      } else {
+        file.open(config.dump_file(),
+                  std::ofstream::out | std::ofstream::app);
+      }
+      file << static_cast<std::string>(barrier_coef) << ' '
+           << static_cast<std::string>(mixing_coef) << '\n';
+      for (Index k = 0; k < graph.flow().outerSize(); ++k) {
+        for (typename Matrix::InnerIterator it(graph.flow(), k); it; ++it) {
+          file << it.row() << ' '
+               << it.col() << ' '
+               << static_cast<std::string>(it.value()) << '\n';
+        }
+      }
+      file << static_cast<std::string>(graph.position()(0));
+      for (Index ii = 1; ii < graph.n(); ++ii) {
+        file << ' ' << static_cast<std::string>(graph.position()(ii));
+      }
+      file << "\n\n";
+    }
+    throw SIGINTException();
+  }
+}
+
 
 template<typename Config> inline void handle_graph(
     const Config& config,
@@ -40,7 +94,14 @@ template<typename Config> inline void handle_graph(
   }
 
   Graph<Config> graph(graph_);
-  graph.init_state(barrier_coef, mixing_coef);
+  if (config.restore_file().empty()) {
+    graph.init_state(barrier_coef, mixing_coef);
+  } else {
+    UTF8Input state_data(config.restore_file());
+    barrier_coef = state_data.get_real();
+    mixing_coef = state_data.get_real();
+    if (state_data) graph.init_state(&state_data);
+  }
 
   // Solve the graph. {{{
   Vector old_position = Vector::Constant(graph.n(), 0);
@@ -52,6 +113,7 @@ template<typename Config> inline void handle_graph(
     std::cout << "barrier: " << barrier_coef << (Config::verbose ? '\n' : ' ');
     int small_steps = 0;
     do {
+      check_for_sigint(config, graph, barrier_coef, mixing_coef);
       old_position = graph.position();
       typename Graph<Config>::MinProblem min_problem =
           graph.get_min_problem(barrier_coef, mixing_coef);
@@ -223,13 +285,29 @@ template<typename Config> inline int main_with_config(const Config& config) {
       std::cout << utils::AnsiColors<Config>::GREEN
         << "Processing stdin"
         << utils::AnsiColors<Config>::ENDC << '\n' << std::flush;
+    try {
       handle_graph(config, Graph<Config>(config, UTF8Input()));
+    } catch (SIGINTException& e) {
+      std::cout << utils::AnsiColors<Config>::YELLOW
+                << "\nSIGINT caught while processing stdin"
+                << utils::AnsiColors<Config>::ENDC << '\n'
+                << std::flush;
+    }
   } else {
     for (const std::string& input_file : config.input_files()) {
+      if (sigint_caught) break;
       std::cout << utils::AnsiColors<Config>::GREEN
-        << "Processing " << input_file
+        << "Processing file: " << input_file
         << utils::AnsiColors<Config>::ENDC << '\n' << std::flush;
-      handle_graph(config, Graph<Config>(config, UTF8Input(input_file)));
+      try {
+        handle_graph(config, Graph<Config>(config, UTF8Input(input_file)));
+      } catch (SIGINTException& e) {
+        std::cout << utils::AnsiColors<Config>::YELLOW
+                  << "\nSIGINT caught while processing file: " << input_file
+                  << utils::AnsiColors<Config>::ENDC << '\n'
+                  << std::flush;
+        break;
+      }
     }
   }
 
@@ -243,11 +321,14 @@ template<typename Config> inline int main_with_config(const Config& config) {
 
 }  // anonymous namespace
 
-constexpr const char* version_string = "Mean Compass version 0.1.0";
+constexpr const char* version_string = "Mean Compass version 0.1.1";
 
 int main(int argc, char** argv) {
   // FIXME: Only the most basic things in main().
   using namespace mean_compass;
+
+  // Chain the SIGINT handler.
+  prev_sigint_handler = signal(SIGINT, sigint_handler);
 
   // Parse cmdline flags. {{{
 
@@ -277,9 +358,20 @@ int main(int argc, char** argv) {
       ("config-file",
            po::value<std::string>(&config.config_file_name()),
            "Parse options from configuration file given.")
-      ("input-file",
+      ("input-file,i",
            po::value<std::vector<std::string>>(&config.input_files())->composing(),
-           "The input files to process, can be used multiple times.");
+           "The input files to process, can be used multiple times.")
+      ("dump-file,D",
+           po::value<std::string>(&config.dump_file()),
+           "The dump file, that will store the state of the last computation, "
+           "if interrupted by SIGINT. By default, the dump is appended to the file.")
+      ("overwrite-dump-file",
+           po::bool_switch(&config.overwrite_dump_file()),
+           "If this flag is set, the dump file will be overwritten. "
+           "Use with caution, may cause loss of data.")
+      ("restore-file,R",
+           po::value<std::string>(&config.restore_file()),
+           "Restore the computation state from the given dump file.");
     po::options_description config_options("Configuration");
     config_options.add_options()
       // We use int, because program_options parses "-5" with unsigned types.
