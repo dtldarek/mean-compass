@@ -9,7 +9,7 @@ LDFLAGS=
 LDLIBS=-lmpfr -lgmp -lboost_random -lboost_program_options
 
 SUBDIRS=.depends build
-SRCS=src/utf8_io.cc src/mean_compass.cc
+SRCS=src/utils.cc src/utf8_io.cc src/mean_compass.cc
 OBJS=$(SRCS:src/%.cc=build/%.o)
 
 all: CXXFLAGS += -DNDEBUG -O2

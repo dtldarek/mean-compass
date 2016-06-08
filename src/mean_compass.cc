@@ -8,7 +8,6 @@
 
 #include "mean_compass.h"
 #include <cassert>
-#include <csignal>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -24,33 +23,16 @@
 
 namespace {
 
-// SIGINT handler {{{
-sig_atomic_t sigint_caught = 0;
-void (*prev_sigint_handler)(int) = SIG_IGN;
-
-void sigint_handler(int signum) {
-  assert(signum == SIGINT);
-  sigint_caught = 1;
-  if (prev_sigint_handler != SIG_IGN && prev_sigint_handler != SIG_DFL) {
-    (*prev_sigint_handler)(signum);
-  }
-}
-
-class SIGINTException : public std::exception {
- public:
-  SIGINTException() : std::exception() { }
-};
-// }}} End of SIGINT handler.
-
 // void check_for_sigint(config, graph, barrier_coef, mixing_coef) {{{
 template<typename Config> inline void check_for_sigint(
     const Config& config,
     const mean_compass::Graph<Config>& graph,
     const typename Config::Real& barrier_coef,
     const typename Config::Real& mixing_coef) {
+  using namespace mean_compass;
   using Index = typename Config::Index;
   using Matrix = typename Config::Matrix;
-  if (sigint_caught) {
+  if (utils::sigint_caught) {
     if (!config.dump_file().empty()) {
       std::ofstream file;
       if (config.overwrite_dump_file()) {
@@ -75,7 +57,7 @@ template<typename Config> inline void check_for_sigint(
       }
       file << "\n\n";
     }
-    throw SIGINTException();
+    throw utils::SIGINTException();
   }
 }  // }}} End of check_for_sigint.
 
@@ -125,11 +107,15 @@ template<typename Config> inline void handle_graph(
           graph.get_min_problem(barrier_coef, mixing_coef);
       SimpleNewton<Config, typename Graph<Config>::MinProblem>
           min_newton(&min_problem);
-      min_newton.step(&min_dual);
-      min_newton.step(&min_dual);
-      min_newton.step(&min_dual);
+      if (small_steps < 3) {
+        min_newton.step_with_backtracking_line_search(&min_dual);
+        min_newton.step_with_backtracking_line_search(&min_dual);
+        min_newton.step_with_backtracking_line_search(&min_dual);
+      } else {
+        min_newton.step_with_exact_line_search(&min_dual);
+      }
       min_problem.update(min_newton.position());
-      if (Config::verbose) {
+      if (Config::verbose) {  // Logging {{{
         //std::cout << "min: "
         //          << std::fixed << graph.position().transpose()
         //          << std::scientific << '\n';
@@ -140,7 +126,7 @@ template<typename Config> inline void handle_graph(
           std::cout << c;
         }
         std::cout << '\n';
-      }
+      }  // }}} End of logging.
 
       if (Config::verbose) {
         mid_position = graph.position();
@@ -149,11 +135,15 @@ template<typename Config> inline void handle_graph(
           graph.get_max_problem(barrier_coef, mixing_coef);
       SimpleNewton<Config, typename Graph<Config>::MaxProblem>
           max_newton(&max_problem);
-      max_newton.step(&max_dual);
-      max_newton.step(&max_dual);
-      max_newton.step(&max_dual);
+      if (small_steps < 3) {
+        min_newton.step_with_backtracking_line_search(&min_dual);
+        min_newton.step_with_backtracking_line_search(&min_dual);
+        min_newton.step_with_backtracking_line_search(&min_dual);
+      } else {
+        min_newton.step_with_exact_line_search(&min_dual);
+      }
       max_problem.update(max_newton.position());
-      if (Config::verbose) {
+      if (Config::verbose) {  // Logging {{{
         //std::cout << "max: "
         //          << std::fixed << graph.position().transpose()
         //          << std::scientific << '\n';
@@ -166,8 +156,9 @@ template<typename Config> inline void handle_graph(
         std::cout << '\n';
       } else {
         std::cout << '.';
-      }
+      }  // End of logging. }}}
       small_steps++;
+      // TODO: Move barrier adjustment to another function or class.
       if (config.barrier_adjustment()) {
         if (small_steps > 10) {
           barrier_coef /= barrier_multiplier;
@@ -311,7 +302,7 @@ template<typename Config> inline int main_with_config(const Config& config) {
         << utils::AnsiColors<Config>::ENDC << '\n' << std::flush;
     try {
       handle_graph(config, Graph<Config>(config, UTF8Input()));
-    } catch (SIGINTException& e) {
+    } catch (utils::SIGINTException& e) {
       std::cout << utils::AnsiColors<Config>::YELLOW
                 << "\nSIGINT caught while processing stdin"
                 << utils::AnsiColors<Config>::ENDC << '\n'
@@ -319,13 +310,13 @@ template<typename Config> inline int main_with_config(const Config& config) {
     }
   } else {
     for (const std::string& input_file : config.input_files()) {
-      if (sigint_caught) break;
+      if (utils::sigint_caught) break;
       std::cout << utils::AnsiColors<Config>::GREEN
         << "Processing file: " << input_file
         << utils::AnsiColors<Config>::ENDC << '\n' << std::flush;
       try {
         handle_graph(config, Graph<Config>(config, UTF8Input(input_file)));
-      } catch (SIGINTException& e) {
+      } catch (utils::SIGINTException& e) {
         std::cout << utils::AnsiColors<Config>::YELLOW
                   << "\nSIGINT caught while processing file: " << input_file
                   << utils::AnsiColors<Config>::ENDC << '\n'
@@ -351,8 +342,7 @@ int main(int argc, char** argv) {  // {{{
   // FIXME: Only the most basic things in main().
   using namespace mean_compass;
 
-  // Chain the SIGINT handler.
-  prev_sigint_handler = signal(SIGINT, sigint_handler);
+  utils::setup_sigint_handler();
 
   // Parse cmdline flags. {{{
 

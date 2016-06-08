@@ -9,6 +9,7 @@
 #ifndef __MEAN_COMPASS_UTILS_H__
 #define __MEAN_COMPASS_UTILS_H__
 
+#include <csignal>
 #include <sstream>
 #include <boost/random.hpp>
 #include <boost/random/random_device.hpp>
@@ -17,6 +18,14 @@
 
 namespace mean_compass {
 namespace utils {
+
+extern sig_atomic_t sigint_caught;
+void setup_sigint_handler();  // Should be called only once.
+class SIGINTException : public std::exception {
+ public:
+  SIGINTException() : std::exception() { }
+};
+
 
 template<typename Config> struct AnsiColors {
   static constexpr bool use_colors = Config::use_colors;
