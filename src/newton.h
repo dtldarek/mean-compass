@@ -77,116 +77,84 @@ class SimpleNewton {
     equality_vector_ = problem_->equality_vector();
   }
 
-  Real step_with_backtracking_line_search(Vector* dual) {
+  void step_with_backtracking_line_search(Vector* dual) {
     auto continuation = [this](Vector* vdual,
                                Vector* direction,
                                Vector* dual_direction) {
-      return this->backtracking_line_search(vdual, direction, dual_direction);
+      this->backtracking_line_search(vdual, direction, dual_direction);
     };
-    return step(dual, continuation);
+    step(dual, continuation);
   }
-  Real step_with_exact_line_search(Vector* dual) {
+  void step_with_exact_line_search(Vector* dual) {
     auto continuation = [this](Vector* vdual,
                                Vector* direction,
                                Vector* dual_direction) {
-      return this->exact_line_search(vdual, direction, dual_direction);
+      this->exact_line_search(vdual, direction, dual_direction);
     };
-    return step(dual, continuation);
+    step(dual, continuation);
   }
 
-  void loop() {
-    Vector dual = Vector::Constant(equality_matrix_.rows(), 1);
-    Real yet = 0;
-    if (step_with_backtracking_line_search(&dual) > problem_->epsilon() &&
-        step_with_backtracking_line_search(&dual) > problem_->epsilon() &&
-        step_with_backtracking_line_search(&dual) > problem_->epsilon()) {
-      do {
-        yet = step_with_exact_line_search(&dual);
-      } while (yet > problem_->epsilon());
-    }
-  }
-
-  Real backtracking_line_search(Vector* dual, Vector* direction, Vector* dual_direction) {
-    Real alt = 0.01;
+  void backtracking_line_search(Vector* dual, Vector* direction, Vector* dual_direction) {
+    Vector new_position;
+    Vector new_dual;
+    Real old_residual = residual(position_, *dual);
+    Real alt_old_residual = old_residual / 64;
     while (true) {
-      Vector new_position = position_ + *direction;
-      Vector new_dual = *dual + *dual_direction;
+      new_position = position_ + *direction;
+      new_dual = *dual + *dual_direction;
       if (new_position.minCoeff() > 0.0 &&
-        residual(new_position, new_dual) <= (Real(1) - alt) *
-                                              residual(position_, *dual)) {
+          residual(new_position, new_dual) + alt_old_residual <= old_residual) {
         position_ = new_position;
         *dual = new_dual;
-        return residual(position_, *dual);
+        break;
       } else {
         // Normally one prefers *= over /=, but /=2 (note 2 instead of 2.0)
         // has much better performance than *= 0.5 or *= Real(0.5).
         *direction /= 2;
         *dual_direction /= 2;
-        alt /= 2;
+        alt_old_residual /= 2;
       }
     }
   }
-  Real exact_line_search(Vector* dual, Vector* direction, Vector* dual_direction) {
+  void exact_line_search(Vector* dual, Vector* direction, Vector* dual_direction) {
+    // Ensure that we are in the domain of the function.
     for (Vector new_position = position_ + *direction;
          new_position.minCoeff() <= 0.0;
          *direction /= 2, *dual_direction /= 2) {
       new_position = position_ + *direction;
     }
+
+    // Initialize binary search.
     Real epsilon = problem_->epsilon() / 4;
     Real lower_factor = 0;
     Real upper_factor = 1;
     Vector lower_position = position_;
     Vector upper_position = position_ + *direction;
     if (problem_->gradient(upper_position).transpose() * *direction < -epsilon) {
+      // Minimum not inside the interval.
       position_  += *direction;
       *dual += *dual_direction;
-      return residual(position_, *dual);
-    }
-    while (!utils::sigint_caught) {
-      const Vector& mid_position = (lower_position + upper_position) / 2;
-      if (problem_->gradient(mid_position).transpose() * *direction > epsilon) {
-        upper_position = mid_position;
-        upper_factor += lower_factor;
-        upper_factor /= 2;
-      } else if (problem_->gradient(mid_position).transpose() * *direction < -epsilon) {
-        lower_position = mid_position;
-        lower_factor += upper_factor;
-        lower_factor /= 2;
-      } else {
-        break;
+    } else {
+      while (!utils::sigint_caught && upper_factor - lower_factor > epsilon) {
+        const Vector& mid_position = (lower_position + upper_position) / 2;
+        if (problem_->gradient(mid_position).transpose() * *direction > epsilon) {
+          upper_position = mid_position;
+          upper_factor += lower_factor;
+          upper_factor /= 2;
+        } else if (problem_->gradient(mid_position).transpose() * *direction < -epsilon) {
+          lower_position = mid_position;
+          lower_factor += upper_factor;
+          lower_factor /= 2;
+        } else {
+          break;
+        }
       }
+      lower_factor += upper_factor;
+      lower_factor /= 2;
+      // Update directions and values;
+      *direction *= lower_factor;   *dual_direction *= lower_factor;
+      position_  += *direction;     *dual           += *dual_direction;
     }
-    lower_factor += upper_factor;
-    lower_factor /= 2;
-    // Update directions and values;
-    *direction *= lower_factor;   *dual_direction *= lower_factor;
-    position_  += *direction;     *dual           += *dual_direction;
-    return residual(position_, *dual);
-  }
-
-
- protected:
-  Problem* problem_;
-  Vector   position_;
-  Matrix   equality_matrix_;
-  Vector   equality_vector_;
-
-  // We could have used member-function-pointer, but templates are simpler.
-  template <typename C> Real step(Vector* dual, C continuation) {
-    typename Config::Diagonal hessian = problem_->hessian(position_);
-    typename Config::Diagonal hessian_inv = hessian.inverse();
-    Vector gradient = problem_->gradient(position_);
-    Matrix mid_mat = equality_matrix_ * hessian_inv;
-    Matrix schur_complement = -mid_mat * equality_matrix_.transpose();
-    Vector infeasibility = equality_matrix_ * position_ - equality_vector_;
-    typename Config::LU solver;
-    solver.compute(schur_complement);
-    Vector new_dual = solver.solve(mid_mat * gradient - infeasibility);
-    Vector direction = hessian_inv * (
-        equality_matrix_.transpose() * new_dual + gradient) * (-1);
-    Vector dual_direction = new_dual - *dual;
-    assert(!boost::math::isnan(direction->norm()));
-    return continuation(dual, &direction, &dual_direction);
   }
 
   Real residual2(const Vector& primal, const Vector& dual) const {
@@ -206,6 +174,36 @@ class SimpleNewton {
   }
   Real residual(const Vector& primal, const Vector& dual) const {
     return boost::multiprecision::sqrt(residual2(primal, dual));
+  }
+  Real residuala(const Vector& primal, const Vector& dual) const {
+    // We only need an approximation of the square root.
+    const Real& res = residual2(primal, dual);
+    int exp = -boost::multiprecision::ilogb(res) / 2 + 1;
+    return boost::multiprecision::scalbn(res, exp);
+  }
+
+ protected:
+  Problem* problem_;
+  Vector   position_;
+  Matrix   equality_matrix_;
+  Vector   equality_vector_;
+
+  // We could have used member-function-pointer, but templates are simpler.
+  template <typename C> void step(Vector* dual, C continuation) {
+    typename Config::Diagonal hessian = problem_->hessian(position_);
+    typename Config::Diagonal hessian_inv = hessian.inverse();
+    Vector gradient = problem_->gradient(position_);
+    Matrix mid_mat = equality_matrix_ * hessian_inv;
+    Matrix schur_complement = -mid_mat * equality_matrix_.transpose();
+    Vector infeasibility = equality_matrix_ * position_ - equality_vector_;
+    typename Config::LU solver;
+    solver.compute(schur_complement);
+    Vector new_dual = solver.solve(mid_mat * gradient - infeasibility);
+    Vector direction = hessian_inv * (
+        equality_matrix_.transpose() * new_dual + gradient) * (-1);
+    Vector dual_direction = new_dual - *dual;
+    assert(!boost::math::isnan(direction.norm()));
+    continuation(dual, &direction, &dual_direction);
   }
 };
 

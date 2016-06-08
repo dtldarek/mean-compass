@@ -73,7 +73,10 @@ template<typename Config> inline void handle_graph(
 
   // Setup {{{
   Real mixing_coef = 0.1;
-  Real barrier_coef = 1.0;
+  Real barrier_coef = 1.0 / graph_.epsilon();
+  if (!config.barrier_start_str().empty()) {
+    barrier_coef = static_cast<Real>(config.barrier_start_str());
+  }
   Real barrier_multiplier = 0.5;
   if (!config.barrier_multiplier_str().empty()) {
     barrier_multiplier = static_cast<Real>(config.barrier_multiplier_str());
@@ -81,8 +84,15 @@ template<typename Config> inline void handle_graph(
 
   Graph<Config> graph(graph_);
   if (config.restore_file().empty()) {
+    std::cout << utils::AnsiColors<Config>::GREEN
+              << "Simple initialization"
+              << utils::AnsiColors<Config>::ENDC << '\n';
     graph.init_state(barrier_coef, mixing_coef);
   } else {
+    std::cout << utils::AnsiColors<Config>::GREEN
+              << "Initialization from file: "
+              << config.restore_file()
+              << utils::AnsiColors<Config>::ENDC << '\n';
     UTF8Input state_data(config.restore_file());
     barrier_coef = state_data.get_real();
     mixing_coef = state_data.get_real();
@@ -91,6 +101,9 @@ template<typename Config> inline void handle_graph(
   // }}} End of setup.
 
   // Solve the graph. {{{
+  std::cout << utils::AnsiColors<Config>::GREEN
+            << "Solving..."
+            << utils::AnsiColors<Config>::ENDC << '\n';
   Vector old_position = Vector::Constant(graph.n(), 0);
   Vector mid_position = Vector::Constant(graph.n(), 0);
   Vector min_dual = Vector::Constant(graph.n(), 1);
@@ -107,7 +120,7 @@ template<typename Config> inline void handle_graph(
           graph.get_min_problem(barrier_coef, mixing_coef);
       SimpleNewton<Config, typename Graph<Config>::MinProblem>
           min_newton(&min_problem);
-      if (small_steps < 3) {
+      if (small_steps < 1) {
         min_newton.step_with_backtracking_line_search(&min_dual);
         min_newton.step_with_backtracking_line_search(&min_dual);
         min_newton.step_with_backtracking_line_search(&min_dual);
@@ -135,7 +148,7 @@ template<typename Config> inline void handle_graph(
           graph.get_max_problem(barrier_coef, mixing_coef);
       SimpleNewton<Config, typename Graph<Config>::MaxProblem>
           max_newton(&max_problem);
-      if (small_steps < 3) {
+      if (small_steps < 1) {
         min_newton.step_with_backtracking_line_search(&min_dual);
         min_newton.step_with_backtracking_line_search(&min_dual);
         min_newton.step_with_backtracking_line_search(&min_dual);
@@ -156,6 +169,7 @@ template<typename Config> inline void handle_graph(
         std::cout << '\n';
       } else {
         std::cout << '.';
+        if (small_steps % 10 == 0) std::cout << std::flush;
       }  // End of logging. }}}
       small_steps++;
       // TODO: Move barrier adjustment to another function or class.
@@ -400,6 +414,9 @@ int main(int argc, char** argv) {  // {{{
            po::value<int>(&config.display_precision())->notifier(
              utils::check_range<int, 2, std::numeric_limits<int>::max()>),
            "Set the precision of the output.")
+      ("barrier-start",
+           po::value<std::string>(&config.barrier_start_str()),
+           "Set the starting value of the barrier coefficient.")
       ("barrier-multiplier,b",
            po::value<std::string>(&config.barrier_multiplier_str()),
            "Set the value the barrier coefficient is multiplied by each turn.")
