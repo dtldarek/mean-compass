@@ -313,14 +313,14 @@ typename Graph<Config>::Matrix Graph<Config>::MinProblem::equality_matrix(
    *
    * However, we modify it using the mixing coeficient, that is, we use
    *
-   *   non_mixing_coef * A - mixing_coef * J
+   *   non_mixing_coef * A - mixing_coef * J,
    *
-   * Where J is the kind-of identity matrix which ensures the -1's above
+   * where J is the kind-of identity matrix which ensures the -1's above
    * stay equal to -1.0 (that is, J would be identity if we were to sort it
    * and process vertices only, instead of max-vertices and min-edges).
    *
-   * Finally, we substitute the last row, with [1.0, 1.0, 1.0, ..., 1.0], so
-   * that it represents the sum of all the variables.
+   * Given modification ensures that the sum of all variables is equal to
+   *   non_mixing_coef = 1 - mixing_coef.
    */
 
   using Triplet = typename Config::Triplet;
@@ -334,35 +334,24 @@ typename Graph<Config>::Matrix Graph<Config>::MinProblem::equality_matrix(
       const Index col = ii;
       // The inner loop iterates over some rows.
       for (typename Matrix::InnerIterator it(graph_->flow_, v_max); it; ++it) {
-        if (it.row() != graph_->n_ - 1) {
-          // Out-flow from v_max to v_row.
-          triplets.push_back(Triplet(it.row(), col, it.value() * non_mixing_coef_));
-        }
+        // Out-flow from v_max to v_row.
+        triplets.push_back(Triplet(it.row(), col, it.value() * non_mixing_coef_));
       }
       // In-flow of v_max.
-      if (v_max != graph_->n_ - 1) {
-        triplets.push_back(Triplet(v_max, col, -1.0));
-      }
-      // Add the 1.0 in the last row.
-      triplets.push_back(Triplet(graph_->n_ - 1, col, 1.0));
+      triplets.push_back(Triplet(v_max, col, -1.0));
     } else {
       const Index v_min = ii - graph_->n_max_;
       // Here we iterate over out-edges, which means
       // we know both the row and the colum.
       // For each column we have at most 3 values:
       //   * the out-flow of current edge,
-      //   * the in-flow of the tail vertex,
-      //   * the 1.0 in the last row.
+      //   * the in-flow of the tail vertex.
       for (Index v_row : graph_->outedges_[v_min]) {
         // Here `col_min` is actually the column.
-        if (v_row != graph_->n_ - 1) {
-          // Out-flow from v_min via e_min to v_row.
-          triplets.push_back(Triplet(v_row, col_min, non_mixing_coef_));
-        }
+        // Out-flow from v_min via e_min to v_row.
+        triplets.push_back(Triplet(v_row, col_min, non_mixing_coef_));
         // In-flow of v_min, i.e., the sum of all related e_min.
         triplets.push_back(Triplet(v_min, col_min, -1.0));
-        // The last row value.
-        triplets.push_back(Triplet(graph_->n_ - 1, col_min, 1.0));
         col_min++;
       }
     }
@@ -376,13 +365,10 @@ template<typename Config>
 typename Graph<Config>::Vector Graph<Config>::MinProblem::equality_vector(
     ) const {
   /* The basic equality vector would be equal to [0, 0, 0, ..., 0, 0, 1],
-   * but because of the mixing_coeficient, we get that:
-   *   * the non-last-row value is equal to non_mixing_coef * mixing_coef / n,
-   *   * the last-row value is equal to non_mixing_coef.
+   * but because of the mixing_coeficient, we get that
+   * the non-last-row value is equal to non_mixing_coef * mixing_coef / n.
    */
-  Vector result = Vector::Constant(graph_->n_, mixing_coef_ / graph_->n_ * -non_mixing_coef_);
-  result(graph_->n_ - 1) = non_mixing_coef_;
-  return result;
+  return Vector::Constant(graph_->n_, mixing_coef_ / graph_->n_ * -non_mixing_coef_);
 }
 template<typename Config> void Graph<Config>::MinProblem::update(
     const Vector& min_position) {
@@ -513,37 +499,24 @@ typename Graph<Config>::Matrix Graph<Config>::MaxProblem::equality_matrix(
       const Index col = ii;
       // The inner loop iterates over some rows.
       for (typename Matrix::InnerIterator it(graph_->flow_, v_min); it; ++it) {
-        if (it.row() != graph_->n_ - 1) {
-          // Out-flow from v_min to v_row.
-          triplets.push_back(Triplet(it.row(), col, it.value() * non_mixing_coef_));
-        }
+        // Out-flow from v_min to v_row.
+        triplets.push_back(Triplet(it.row(), col, it.value() * non_mixing_coef_));
       }
       // In-flow of v_min.
-      if (v_min != graph_->n_ - 1) {
-        triplets.push_back(Triplet(v_min, col, -1.0));
-      }
-      // Add the 1.0 in the last row.
-      triplets.push_back(Triplet(graph_->n_ - 1, col, 1.0));
+      triplets.push_back(Triplet(v_min, col, -1.0));
     } else {
       const Index v_max = ii;
       // Here we iterate over out-edges, which means
       // we know both the row and the colum.
       // For each column we have at most 3 values:
       //   * the out-flow of current edge,
-      //   * the in-flow of the tail vertex,
-      //   * the 1.0 in the last row.
+      //   * the in-flow of the tail vertex.
       for (Index v_row : graph_->outedges_[v_max]) {
         // Here `col_max` is actually the column.
-        if (v_row != graph_->n_ - 1) {
-          // Out-flow from v_max via e_max to v_row.
-          triplets.push_back(Triplet(v_row, col_max, non_mixing_coef_));
-        }
-        if (v_max != graph_->n_ - 1) {
-          // In-flow of v_max, i.e., the sum of all related e_max.
-          triplets.push_back(Triplet(v_max, col_max, -1.0));
-        }
-        // The last row value.
-        triplets.push_back(Triplet(graph_->n_ - 1, col_max, 1.0));
+        // Out-flow from v_max via e_max to v_row.
+        triplets.push_back(Triplet(v_row, col_max, non_mixing_coef_));
+        // In-flow of v_max, i.e., the sum of all related e_max.
+        triplets.push_back(Triplet(v_max, col_max, -1.0));
         col_max++;
       }
     }
@@ -557,9 +530,7 @@ template<typename Config>
 typename Graph<Config>::Vector Graph<Config>::MaxProblem::equality_vector(
     ) const {
   // See the comment at MinProblem::equality_vector.
-  Vector result = Vector::Constant(graph_->n_, mixing_coef_ / graph_->n_ * -non_mixing_coef_);
-  result(graph_->n_ - 1) = non_mixing_coef_;
-  return result;
+  return Vector::Constant(graph_->n_, mixing_coef_ / graph_->n_ * -non_mixing_coef_);
 }
 template<typename Config> void Graph<Config>::MaxProblem::update(
     const Vector& max_position) {
