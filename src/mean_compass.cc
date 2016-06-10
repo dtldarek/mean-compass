@@ -72,15 +72,17 @@ template<typename Config> inline void handle_graph(
   using Vector  = typename Config::Vector;
 
   // Setup {{{
-  Real mixing_coef = 0.1;
-  Real barrier_coef = 1.0 / graph_.epsilon();
+  Real mixing_coef = 1e-1;
+  Real barrier_coef = 1;
   if (!config.barrier_start_str().empty()) {
     barrier_coef = static_cast<Real>(config.barrier_start_str());
   }
-  Real barrier_multiplier = 0.5;
+  Real barrier_multiplier = 2;
   if (!config.barrier_multiplier_str().empty()) {
     barrier_multiplier = static_cast<Real>(config.barrier_multiplier_str());
   }
+  // TODO: is this enough?
+  Real mixing_multiplier = 1 / boost::multiprecision::sqrt(barrier_multiplier);
 
   Graph<Config> graph(graph_);
   if (config.restore_file().empty()) {
@@ -108,9 +110,9 @@ template<typename Config> inline void handle_graph(
   Vector mid_position = Vector::Constant(graph.n(), 0);
   Vector min_dual = Vector::Constant(graph.n(), 1);
   Vector max_dual = Vector::Constant(graph.n(), 1);
-  for (; barrier_coef >= graph.epsilon();
+  for (; barrier_coef <= 1.0/graph.epsilon();
          barrier_coef *= barrier_multiplier,
-         mixing_coef *= barrier_multiplier) {
+         mixing_coef *= mixing_multiplier) {
     std::cout << "barrier: " << barrier_coef << (Config::verbose ? '\n' : ' ');
     int small_steps = 0;
     do {
@@ -120,7 +122,7 @@ template<typename Config> inline void handle_graph(
           graph.get_min_problem(barrier_coef, mixing_coef);
       SimpleNewton<Config, typename Graph<Config>::MinProblem>
           min_newton(&min_problem);
-      if (small_steps < 1) {
+      if (small_steps < 0) {
         min_newton.step_with_backtracking_line_search(&min_dual);
         min_newton.step_with_backtracking_line_search(&min_dual);
         min_newton.step_with_backtracking_line_search(&min_dual);
@@ -148,12 +150,12 @@ template<typename Config> inline void handle_graph(
           graph.get_max_problem(barrier_coef, mixing_coef);
       SimpleNewton<Config, typename Graph<Config>::MaxProblem>
           max_newton(&max_problem);
-      if (small_steps < 1) {
-        min_newton.step_with_backtracking_line_search(&min_dual);
-        min_newton.step_with_backtracking_line_search(&min_dual);
-        min_newton.step_with_backtracking_line_search(&min_dual);
+      if (small_steps < 0) {
+        max_newton.step_with_backtracking_line_search(&max_dual);
+        max_newton.step_with_backtracking_line_search(&max_dual);
+        max_newton.step_with_backtracking_line_search(&max_dual);
       } else {
-        min_newton.step_with_exact_line_search(&min_dual);
+        max_newton.step_with_exact_line_search(&max_dual);
       }
       max_problem.update(max_newton.position());
       if (Config::verbose) {  // Logging {{{
@@ -176,21 +178,19 @@ template<typename Config> inline void handle_graph(
       if (config.barrier_adjustment()) {
         if (small_steps > 10) {
           barrier_coef /= barrier_multiplier;
-          mixing_coef /= barrier_multiplier;
-          Real barrier_step = Real(1) / (Real(1) - barrier_multiplier) + Real(1);
-          barrier_multiplier = Real(1) - Real(1) / barrier_step;
-          std::cout << " new step: " << barrier_step << ' ';
+          mixing_coef /= mixing_multiplier;
+          barrier_multiplier = boost::multiprecision::sqrt(barrier_multiplier);
+          mixing_multiplier = 1 / boost::multiprecision::sqrt(barrier_multiplier);
+          std::cout << " new step: " << barrier_multiplier << ' ';
           break;
         }
       }
     } while ((graph.position() - old_position).norm() > graph.epsilon());
-    if (config.barrier_adjustment() && small_steps <= 2 && barrier_multiplier > 0.5) {
-      Real barrier_step = Real(1) / (Real(1) - barrier_multiplier) - Real(1);
-      if (barrier_step < 2) {
-        barrier_step = 2;
-      }
-      barrier_multiplier = Real(1) - Real(1) / barrier_step;
-      std::cout << " new step: " << barrier_step << ' ';
+    if (config.barrier_adjustment() && small_steps <= 2 && barrier_multiplier < 256) {
+      barrier_multiplier *= barrier_multiplier;
+      if (barrier_multiplier > 256) barrier_multiplier = 256;
+      mixing_multiplier = 1 / boost::multiprecision::sqrt(barrier_multiplier);
+      std::cout << " new step: " << barrier_multiplier << ' ';
     }
     std::cout << '\n';
   }

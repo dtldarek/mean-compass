@@ -261,19 +261,20 @@ typename Graph<Config>::Real Graph<Config>::MinProblem::value(
     result += min_position(ii) * graph_->min_target_(ii);
     barrier += boost::multiprecision::log(min_position(ii));
   }
-  result -= barrier * barrier_coef_;
+  result *= barrier_coef_;
+  result -= barrier;
   return result;
 }
 template<typename Config>
 typename Graph<Config>::Vector Graph<Config>::MinProblem::gradient(
     const Vector& min_position) const {
-  Vector result = graph_->min_target_;
+  Vector result = graph_->min_target_ * barrier_coef_;
   for (Index ii = 0; ii < graph_->n_max_; ++ii) {
     const Index v_max = ii + graph_->n_min_;
-    result(ii) += -Real(graph_->outdegrees_[v_max]) / min_position(ii) * barrier_coef_;
+    result(ii) += -Real(graph_->outdegrees_[v_max]) / min_position(ii);
   }
   for (Index ii = graph_->n_max_; ii < graph_->n_max_ + graph_->m_min_; ++ii) {
-    result(ii) += -Real(1) / min_position(ii) * barrier_coef_;
+    result(ii) += -Real(1) / min_position(ii);
   }
   return result;
 }
@@ -284,10 +285,10 @@ typename Graph<Config>::Diagonal Graph<Config>::MinProblem::hessian(
   for (Index ii = 0; ii < graph_->n_max_; ++ii) {
     const Index v_max = ii + graph_->n_min_;
     result(ii) += Real(graph_->outdegrees_[v_max]) /
-      min_position(ii) / min_position(ii) * barrier_coef_;
+      min_position(ii) / min_position(ii);
   }
   for (Index ii = graph_->n_max_; ii < graph_->n_max_ + graph_->m_min_; ++ii) {
-    result(ii) += Real(1) / min_position(ii) / min_position(ii) * barrier_coef_;
+    result(ii) += Real(1) / min_position(ii) / min_position(ii);
   }
   return result.asDiagonal();
 }
@@ -447,19 +448,20 @@ typename Graph<Config>::Real Graph<Config>::MaxProblem::value(
     result -= max_position(ii) * graph_->max_target_(ii);
     barrier += boost::multiprecision::log(max_position(ii));
   }
-  result -= barrier * barrier_coef_;
+  result *= barrier_coef_;
+  result -= barrier;
   return result;
 }
 template<typename Config>
 typename Graph<Config>::Vector Graph<Config>::MaxProblem::gradient(
     const Vector& max_position) const {
-  Vector result = -graph_->max_target_;
+  Vector result = -graph_->max_target_ * barrier_coef_;
   for (Index ii = 0; ii < graph_->n_min_; ++ii) {
     const Index v_min = ii + graph_->n_max_;
-    result(ii) += -Real(graph_->outdegrees_[v_min]) / max_position(ii) * barrier_coef_;
+    result(ii) += -Real(graph_->outdegrees_[v_min]) / max_position(ii);
   }
   for (Index ii = graph_->n_min_; ii < graph_->n_min_ + graph_->m_max_; ++ii) {
-    result(ii) += -Real(1) / max_position(ii) * barrier_coef_;
+    result(ii) += -Real(1) / max_position(ii);
   }
   return result;
 }
@@ -470,10 +472,10 @@ typename Graph<Config>::Diagonal Graph<Config>::MaxProblem::hessian(
   for (Index ii = 0; ii < graph_->n_min_; ++ii) {
     const Index v_min = ii + graph_->n_max_;
     result(ii) += Real(graph_->outdegrees_[v_min]) /
-      max_position(ii) / max_position(ii) * barrier_coef_;
+      max_position(ii) / max_position(ii);
   }
   for (Index ii = graph_->n_min_; ii < graph_->n_min_ + graph_->m_max_; ++ii) {
-    result(ii) += Real(1) / max_position(ii) / max_position(ii) * barrier_coef_;
+    result(ii) += Real(1) / max_position(ii) / max_position(ii);
   }
   return result.asDiagonal();
 }

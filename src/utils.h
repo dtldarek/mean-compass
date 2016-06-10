@@ -84,6 +84,11 @@ void check_range(const T& value) {
   }
 }
 
+template<typename Real> inline auto asqrt(Real value)
+    -> decltype(boost::multiprecision::scalbn(Real(0.0), int(0))) {
+  int exp = -boost::multiprecision::ilogb(value) / 2;
+  return boost::multiprecision::scalbn(value, exp);
+}
 
 }  // namespace utils
 }  // namespace mean_compass

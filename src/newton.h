@@ -177,9 +177,7 @@ class SimpleNewton {
   }
   Real residuala(const Vector& primal, const Vector& dual) const {
     // We only need an approximation of the square root.
-    const Real& res = residual2(primal, dual);
-    int exp = -boost::multiprecision::ilogb(res) / 2 + 1;
-    return boost::multiprecision::scalbn(res, exp);
+    return utils::asqrt(residual2(primal, dual))*2;
   }
 
  protected:
@@ -203,6 +201,26 @@ class SimpleNewton {
         equality_matrix_.transpose() * new_dual + gradient) * (-1);
     Vector dual_direction = new_dual - *dual;
     assert(!boost::math::isnan(direction.norm()));
+    assert(!boost::math::isnan(dual_direction.norm()));
+    if (direction.norm() > 1) {
+      dual_direction /= direction.norm();
+      direction /= direction.norm();
+      new_dual = *dual + dual_direction;
+    }
+    Real check = static_cast<Real>(gradient.transpose() * direction);
+    if (check >= 0.0) {
+      for (Vector new_position = position_ + direction;
+           new_position.minCoeff() <= 0.0;
+           direction /= 2, dual_direction /= 2) {
+        new_position = position_ + direction;
+      }
+      *dual += dual_direction;
+      position_ += direction;
+      if (!Config::verbose) {
+        std::cout << '!';
+      }
+      return;
+    }
     continuation(dual, &direction, &dual_direction);
   }
 };
