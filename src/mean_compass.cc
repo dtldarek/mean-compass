@@ -100,6 +100,11 @@ template<typename Config> inline void handle_graph(
     mixing_coef = state_data.get_real();
     if (state_data) graph.init_state(&state_data);
   }
+  std::cout << utils::AnsiColors<Config>::GREEN
+            << "Epsilon: "
+            << graph.epsilon()
+            << utils::AnsiColors<Config>::ENDC << '\n';
+
   // }}} End of setup.
 
   // Solve the graph. {{{
@@ -110,37 +115,40 @@ template<typename Config> inline void handle_graph(
   Vector mid_position = Vector::Constant(graph.n(), 0);
   Vector min_dual = Vector::Constant(graph.n(), 1);
   Vector max_dual = Vector::Constant(graph.n(), 1);
+  Real residual_sum = 0;
   for (; barrier_coef <= 1.0/graph.epsilon();
          barrier_coef *= barrier_multiplier,
          mixing_coef *= mixing_multiplier) {
     std::cout << "barrier: " << barrier_coef << (Config::verbose ? '\n' : ' ');
     int small_steps = 0;
     do {
+      residual_sum = 0;
       check_for_sigint(config, graph, barrier_coef, mixing_coef);
       old_position = graph.position();
+
       typename Graph<Config>::MinProblem min_problem =
           graph.get_min_problem(barrier_coef, mixing_coef);
       SimpleNewton<Config, typename Graph<Config>::MinProblem>
           min_newton(&min_problem);
-      if (small_steps < 0) {
-        min_newton.step_with_backtracking_line_search(&min_dual);
-        min_newton.step_with_backtracking_line_search(&min_dual);
-        min_newton.step_with_backtracking_line_search(&min_dual);
-      } else {
-        min_newton.step_with_exact_line_search(&min_dual);
-      }
+      min_newton.step_with_backtracking_line_search(&min_dual);
       min_problem.update(min_newton.position());
+      residual_sum = min_newton.residual(min_newton.position(), min_dual);
+
       if (Config::verbose) {  // Logging {{{
-        //std::cout << "min: "
-        //          << std::fixed << graph.position().transpose()
-        //          << std::scientific << '\n';
-        Vector diff = graph.position() - old_position;
-        std::cout << "min: ";
-        for (Index ii = 0; ii < graph.n(); ++ii) {
-          char c = diff(ii) > graph.epsilon() / graph.n() ? '+' : diff(ii) < -graph.epsilon() / graph.n() ? '-' : ' ';
-          std::cout << c;
+        if (config.display_precision() >= 3) {
+          std::cout << "min: "
+                    << std::fixed << graph.position().transpose()
+                    << std::scientific << '\n';
+        } else {
+          Vector diff = graph.position() - old_position;
+          std::cout << "min: ";
+          for (Index ii = 0; ii < graph.n(); ++ii) {
+            char c = diff(ii) >  graph.epsilon() / graph.n() / 2 ? '+' :
+                     diff(ii) < -graph.epsilon() / graph.n() / 2 ? '-' : ' ';
+            std::cout << c;
+          }
+          std::cout << '\n';
         }
-        std::cout << '\n';
       }  // }}} End of logging.
 
       if (Config::verbose) {
@@ -150,25 +158,25 @@ template<typename Config> inline void handle_graph(
           graph.get_max_problem(barrier_coef, mixing_coef);
       SimpleNewton<Config, typename Graph<Config>::MaxProblem>
           max_newton(&max_problem);
-      if (small_steps < 0) {
-        max_newton.step_with_backtracking_line_search(&max_dual);
-        max_newton.step_with_backtracking_line_search(&max_dual);
-        max_newton.step_with_backtracking_line_search(&max_dual);
-      } else {
-        max_newton.step_with_exact_line_search(&max_dual);
-      }
+      max_newton.step_with_backtracking_line_search(&max_dual);
       max_problem.update(max_newton.position());
+      residual_sum = max_newton.residual(max_newton.position(), max_dual);
+
       if (Config::verbose) {  // Logging {{{
-        //std::cout << "max: "
-        //          << std::fixed << graph.position().transpose()
-        //          << std::scientific << '\n';
-        Vector diff = graph.position() - mid_position;
-        std::cout << "max: ";
-        for (Index ii = 0; ii < graph.n(); ++ii) {
-          char c = diff(ii) > graph.epsilon() / graph.n() ? '+' : diff(ii) < -graph.epsilon() / graph.n() ? '-' : ' ';
-          std::cout << c;
+        if (config.display_precision() >= 3) {
+          std::cout << "max: "
+            << std::fixed << graph.position().transpose()
+            << std::scientific << '\n';
+        } else {
+          Vector diff = graph.position() - mid_position;
+          std::cout << "max: ";
+          for (Index ii = 0; ii < graph.n(); ++ii) {
+            char c = diff(ii) >  graph.epsilon() / graph.n() / 2 ? '+' :
+                     diff(ii) < -graph.epsilon() / graph.n() / 2 ? '-' : ' ';
+            std::cout << c;
+          }
+          std::cout << '\n';
         }
-        std::cout << '\n';
       } else {
         std::cout << '.';
         if (small_steps % 10 == 0) std::cout << std::flush;
@@ -185,7 +193,7 @@ template<typename Config> inline void handle_graph(
           break;
         }
       }
-    } while ((graph.position() - old_position).norm() > graph.epsilon());
+    } while (residual_sum > graph.epsilon() * 2);
     if (config.barrier_adjustment() && small_steps <= 2 && barrier_multiplier < 256) {
       barrier_multiplier *= barrier_multiplier;
       if (barrier_multiplier > 256) barrier_multiplier = 256;
@@ -356,8 +364,6 @@ int main(int argc, char** argv) {  // {{{
   // FIXME: Only the most basic things in main().
   using namespace mean_compass;
 
-  utils::setup_sigint_handler();
-
   // Parse cmdline flags. {{{
 
   // Static options:
@@ -386,13 +392,19 @@ int main(int argc, char** argv) {  // {{{
       ("config-file",
            po::value<std::string>(&config.config_file_name()),
            "Parse options from configuration file given.")
+      ("default-sigint-handler",
+            po::bool_switch(&config.default_sigint_handler()),
+            "Do not try to catch SIGINT, use the default handler "
+            "(useful for debugging).")
       ("input-file,i",
-           po::value<std::vector<std::string>>(&config.input_files())->composing(),
+           po::value<std::vector<std::string>>(
+               &config.input_files())->composing(),
            "The input files to process, can be used multiple times.")
       ("dump-file,D",
            po::value<std::string>(&config.dump_file()),
            "The dump file, that will store the state of the last computation, "
-           "if interrupted by SIGINT. By default, the dump is appended to the file.")
+           "if interrupted by SIGINT. By default, the dump is appended to the "
+           "file.")
       ("overwrite-dump-file",
            po::bool_switch(&config.overwrite_dump_file()),
            "If this flag is set, the dump file will be overwritten. "
@@ -460,6 +472,10 @@ int main(int argc, char** argv) {  // {{{
     return 1;
   }
   // End of parsing cmdline flags }}}
+
+  if (!config.default_sigint_handler()) {
+    utils::setup_sigint_handler();
+  }
 
   // Call main_with_config. {{{
   if (!option_verbose && !option_use_colors) {

@@ -89,34 +89,58 @@ class SimpleNewton {
     auto continuation = [this](Vector* vdual,
                                Vector* direction,
                                Vector* dual_direction) {
-      this->exact_line_search(vdual, direction, dual_direction);
+      this->exact_line_search(vdual, direction, dual_direction, false);
+    };
+    step(dual, continuation);
+  }
+  void step_with_exact_line_search_rescale(Vector* dual) {
+    auto continuation = [this](Vector* vdual,
+                               Vector* direction,
+                               Vector* dual_direction) {
+      this->exact_line_search(vdual, direction, dual_direction, true);
     };
     step(dual, continuation);
   }
 
-  void backtracking_line_search(Vector* dual, Vector* direction, Vector* dual_direction) {
-    Vector new_position;
-    Vector new_dual;
+  void backtracking_line_search(Vector* dual,
+                                Vector* direction,
+                                Vector* dual_direction) {
+    for (Vector tmp_new_position = position_ + *direction;
+         tmp_new_position.minCoeff() <= 0.0;
+         *direction /= 2, *dual_direction /= 2) {
+      tmp_new_position = position_ + *direction;
+    }
     Real old_residual = residual(position_, *dual);
     Real alt_old_residual = old_residual / 64;
-    while (true) {
+    Vector new_position = position_ + *direction;
+    Vector new_dual = *dual + *dual_direction;
+    assert(residual2d(position_, *dual, *direction, *dual_direction) < 0);
+    while (!utils::sigint_caught &&
+           (residual(new_position,
+                    new_dual) > (1-problem_->epsilon()) * old_residual ||
+            residual2d(new_position, new_dual,
+                      *direction, *dual_direction) >= 0) &&
+           (residual(new_position,
+                    new_dual) + alt_old_residual > old_residual)) {
+      // Normally one prefers *= over /=, but /=2 (note 2 instead of 2.0)
+      // has much better performance than *= 0.5 or *= Real(0.5).
+      *direction /= 2;
+      *dual_direction /= 2;
+      alt_old_residual /= 2;
       new_position = position_ + *direction;
       new_dual = *dual + *dual_direction;
-      if (new_position.minCoeff() > 0.0 &&
-          residual(new_position, new_dual) + alt_old_residual <= old_residual) {
-        position_ = new_position;
-        *dual = new_dual;
-        break;
-      } else {
-        // Normally one prefers *= over /=, but /=2 (note 2 instead of 2.0)
-        // has much better performance than *= 0.5 or *= Real(0.5).
-        *direction /= 2;
-        *dual_direction /= 2;
-        alt_old_residual /= 2;
-      }
     }
+    position_ = new_position;
+    *dual = new_dual;
   }
-  void exact_line_search(Vector* dual, Vector* direction, Vector* dual_direction) {
+  void exact_line_search(Vector* dual,
+                         Vector* direction,
+                         Vector* dual_direction,
+                         bool rescale) {
+    if (rescale) {
+      *dual_direction /= direction->norm();
+      *direction /= direction->norm();
+    }
     // Ensure that we are in the domain of the function.
     for (Vector new_position = position_ + *direction;
          new_position.minCoeff() <= 0.0;
@@ -130,18 +154,24 @@ class SimpleNewton {
     Real upper_factor = 1;
     Vector lower_position = position_;
     Vector upper_position = position_ + *direction;
-    if (problem_->gradient(upper_position).transpose() * *direction < -epsilon) {
+    Vector lower_dual = *dual;
+    Vector upper_dual = *dual + *dual_direction;
+    if (residual2d(upper_position, upper_dual,
+                   *direction, *dual_direction) < -epsilon) {
       // Minimum not inside the interval.
       position_  += *direction;
       *dual += *dual_direction;
     } else {
       while (!utils::sigint_caught && upper_factor - lower_factor > epsilon) {
         const Vector& mid_position = (lower_position + upper_position) / 2;
-        if (problem_->gradient(mid_position).transpose() * *direction > epsilon) {
+        const Vector& mid_dual = (lower_dual + upper_dual) / 2;
+        if (residual2d(mid_position, mid_dual,
+                       *direction, *dual_direction) > epsilon) {
           upper_position = mid_position;
           upper_factor += lower_factor;
           upper_factor /= 2;
-        } else if (problem_->gradient(mid_position).transpose() * *direction < -epsilon) {
+        } else if (residual2d(mid_position, mid_dual,
+                              *direction, *dual_direction) < -epsilon) {
           lower_position = mid_position;
           lower_factor += upper_factor;
           lower_factor /= 2;
@@ -160,7 +190,7 @@ class SimpleNewton {
   Real residual2(const Vector& primal, const Vector& dual) const {
     Vector r1 = problem_->gradient(primal) +
                 equality_matrix_.transpose() * dual;
-    Vector r2 = equality_matrix_ * position_ - equality_vector_;
+    Vector r2 = equality_matrix_ * primal - equality_vector_;
     Real result = 0;
     for (Index ii = 0; ii < r1.size(); ++ii) {
       const Real& value = r1(ii);
@@ -179,6 +209,25 @@ class SimpleNewton {
     // We only need an approximation of the square root.
     return utils::asqrt(residual2(primal, dual))*2;
   }
+  Real residual2d(const Vector& primal, const Vector& dual,
+                  const Vector& primal_direction,
+                  const Vector& dual_direction) {
+    const Vector& primal_gradient_from_primal =
+      2 * problem_->hessian(primal) * (problem_->gradient(primal) +
+                                       equality_matrix_.transpose() * dual);
+    const Vector& dual_gradient_from_primal =
+      2 * equality_matrix_ * (problem_->gradient(primal) +
+                              equality_matrix_.transpose() * dual);
+    const Vector& primal_gradient_from_dual =
+      2 * equality_matrix_.transpose() * (equality_matrix_ * primal -
+                                          equality_vector_);
+    return static_cast<Real>(primal_direction.transpose() *
+                             primal_gradient_from_primal) +
+           static_cast<Real>(dual_direction.transpose() *
+                             dual_gradient_from_primal) +
+           static_cast<Real>(primal_direction.transpose() *
+                             primal_gradient_from_dual);
+  }
 
  protected:
   Problem* problem_;
@@ -190,37 +239,18 @@ class SimpleNewton {
   template <typename C> void step(Vector* dual, C continuation) {
     typename Config::Diagonal hessian = problem_->hessian(position_);
     typename Config::Diagonal hessian_inv = hessian.inverse();
+    typename Config::LU solver;
     Vector gradient = problem_->gradient(position_);
     Matrix mid_mat = equality_matrix_ * hessian_inv;
-    Matrix schur_complement = -mid_mat * equality_matrix_.transpose();
+    Matrix neg_schur_complement = mid_mat * equality_matrix_.transpose();
     Vector infeasibility = equality_matrix_ * position_ - equality_vector_;
-    typename Config::LU solver;
-    solver.compute(schur_complement);
-    Vector new_dual = solver.solve(mid_mat * gradient - infeasibility);
+    solver.compute(neg_schur_complement);
+    Vector new_dual = solver.solve(infeasibility - mid_mat * gradient);
     Vector direction = hessian_inv * (
         equality_matrix_.transpose() * new_dual + gradient) * (-1);
     Vector dual_direction = new_dual - *dual;
     assert(!boost::math::isnan(direction.norm()));
     assert(!boost::math::isnan(dual_direction.norm()));
-    if (direction.norm() > 1) {
-      dual_direction /= direction.norm();
-      direction /= direction.norm();
-      new_dual = *dual + dual_direction;
-    }
-    Real check = static_cast<Real>(gradient.transpose() * direction);
-    if (check >= 0.0) {
-      for (Vector new_position = position_ + direction;
-           new_position.minCoeff() <= 0.0;
-           direction /= 2, dual_direction /= 2) {
-        new_position = position_ + direction;
-      }
-      *dual += dual_direction;
-      position_ += direction;
-      if (!Config::verbose) {
-        std::cout << '!';
-      }
-      return;
-    }
     continuation(dual, &direction, &dual_direction);
   }
 };
